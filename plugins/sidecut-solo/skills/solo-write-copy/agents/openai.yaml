@@ -1,0 +1,7 @@
+interface:
+  display_name: "Write copy"
+  short_description: "Writes words people read so they're specific, sound like their author and carry no AI-writing tells."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-write-copy to write words people read so they're specific, sound like their author and carry no AI-writing tells."

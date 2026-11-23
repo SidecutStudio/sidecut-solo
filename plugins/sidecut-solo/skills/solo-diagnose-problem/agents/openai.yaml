@@ -1,0 +1,7 @@
+interface:
+  display_name: "Diagnose problem"
+  short_description: "Investigates a failure or performance problem using evidence."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-diagnose-problem to investigate a failure or performance problem using evidence."

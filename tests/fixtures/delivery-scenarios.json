@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "configured-merge-no-publication",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": false,
+        "user_publication": false,
+        "publication_effect": "none",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": false,
+        "ready": true
+      }
+    },
+    {
+      "id": "configured-merge-missing-publication",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": false,
+        "user_publication": false,
+        "publication_effect": "automatic",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": false,
+        "ready": false
+      }
+    },
+    {
+      "id": "explicit-end-to-end-ship",
+      "input": {
+        "merge_policy": "ask",
+        "user_merge": true,
+        "user_publication": true,
+        "publication_effect": "automatic",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": true,
+        "ready": true
+      }
+    },
+    {
+      "id": "prior-human-release-scope-persists",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": false,
+        "user_publication": true,
+        "publication_effect": "automatic",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": true,
+        "ready": true
+      }
+    },
+    {
+      "id": "never-vetoes-explicit-ship",
+      "input": {
+        "merge_policy": "never",
+        "user_merge": true,
+        "user_publication": true,
+        "publication_effect": "automatic",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": false,
+        "publication_authorized": true,
+        "ready": false
+      }
+    },
+    {
+      "id": "unknown-effect-needs-inspection",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": true,
+        "user_publication": true,
+        "publication_effect": "unknown",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "ready": false
+      }
+    },
+    {
+      "id": "native-host-approval-still-needed",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": true,
+        "user_publication": true,
+        "publication_effect": "automatic",
+        "host_scope": "approval_required"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": true,
+        "ready": false
+      }
+    },
+    {
+      "id": "unknown-host-remains-unresolved",
+      "input": {
+        "merge_policy": "when-green",
+        "user_merge": true,
+        "user_publication": false,
+        "publication_effect": "none",
+        "host_scope": "unknown"
+      },
+      "expected": {
+        "ready": false
+      }
+    },
+    {
+      "id": "ask-without-human-authorization",
+      "input": {
+        "merge_policy": "ask",
+        "user_merge": false,
+        "user_publication": false,
+        "publication_effect": "none",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": false,
+        "ready": false
+      }
+    },
+    {
+      "id": "merge-only-does-not-authorize-release",
+      "input": {
+        "merge_policy": "ask",
+        "user_merge": true,
+        "user_publication": false,
+        "publication_effect": "automatic",
+        "host_scope": "allowed"
+      },
+      "expected": {
+        "merge_authorized": true,
+        "publication_authorized": false,
+        "ready": false
+      }
+    }
+  ]
+}

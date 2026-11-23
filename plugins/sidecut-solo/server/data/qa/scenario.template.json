@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "example-flow",
+  "version": 1,
+  "title": "Replace with a user outcome",
+  "task": "Describe the request or actions a user performs.",
+  "setup": ["Describe initial files, services and relevant permissions."],
+  "allowed_effects": ["Describe permitted writes or external effects; an empty list permits none."],
+  "checks": [
+    {
+      "id": "user-outcome",
+      "expected": "State an observable acceptance criterion.",
+      "method": "Describe the independent observation or deterministic check."
+    }
+  ]
+}

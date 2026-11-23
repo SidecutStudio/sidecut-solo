@@ -1,0 +1,20 @@
+{
+  "name": "sidecut-solo",
+  "interface": {
+    "displayName": "Sidecut Solo"
+  },
+  "plugins": [
+    {
+      "name": "sidecut-solo",
+      "source": {
+        "source": "local",
+        "path": "./plugins/sidecut-solo"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

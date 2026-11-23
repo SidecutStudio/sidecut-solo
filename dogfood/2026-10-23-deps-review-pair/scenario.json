@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "id": "deps-review-pair",
+  "version": 2,
+  "title": "Review a staged lab deps change that lets a builder run code in a networked container",
+  "task": "Review the staged change in this repo before I merge it. It adds a `lab deps` command that installs npm dependencies for a lab's reference or build folder.",
+  "setup": [
+    "example-org/example-app at 83314cf as a fresh git repo, with the original, unfixed `lab deps` change staged: scripts/lib/deps.ts (npm ci/install --ignore-scripts run inside the target folder in a networked container, guarded by an existsSync check for .npmrc) and its lab.ts case.",
+    "Fresh `claude -p` session, --setting-sources project, model claude-opus-5-5, tools Read, Grep, Glob, Bash (git and read-only commands), Agent, Skill; --strict-mcp-config with no MCP servers; permission mode dontAsk. Both arms see the same 22 built-in skills (including code-review) and the same built-in agents.",
+    "With arm: Solo Workflow 0.4.0 loaded with --plugin-dir, adding its 12 skills and 4 agents. Without arm: no other plugins."
+  ],
+  "allowed_effects": ["None: read-only review."],
+  "checks": [
+    {
+      "id": "npmrc-code-execution",
+      "expected": "The review reports that content in a builder-controlled folder (an .npmrc, including one reached through a symlink the host-side existsSync check doesn't follow the same way, or other npm config) can make the networked npm run code or change its behavior.",
+      "method": "Read the session's final review text; pass if this risk is stated with deps.ts as the location."
+    },
+    {
+      "id": "lockfile-arbitrary-fetch",
+      "expected": "The review reports that a builder-written package-lock.json makes npm ci fetch from arbitrary resolved URLs (for example the reference's own source).",
+      "method": "Read the session's final review text; pass if this risk is stated."
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "scenario_id": "example-flow",
+  "scenario_version": 1,
+  "kind": "regression",
+  "subject": {
+    "name": "replace-with-tested-subject",
+    "version": null,
+    "revision": null,
+    "dirty": false,
+    "fingerprint": null
+  },
+  "environment": {
+    "host": "replace-with-host",
+    "host_version": null,
+    "requested_model": null,
+    "resolved_model": null
+  },
+  "invocation": "unknown",
+  "started_at": null,
+  "finished_at": null,
+  "status": "not_run",
+  "checks": [
+    {
+      "id": "user-outcome",
+      "status": "not_run",
+      "observed": "Not executed.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "interventions": [],
+  "limitations": ["Not executed."]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "sidecut-solo",
+  "version": "0.37.1",
+  "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+  "author": {
+    "name": "Sidecut Studio",
+    "url": "https://sidecut.dev"
+  },
+  "homepage": "https://sidecut.dev",
+  "repository": "https://github.com/SidecutStudio/sidecut-solo",
+  "license": "MIT",
+  "keywords": ["engineering", "workflow", "review", "verification"]
+}

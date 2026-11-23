@@ -1,0 +1,7 @@
+interface:
+  display_name: "Build change"
+  short_description: "Implements a requested change and checks its behavior."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-build-change to implement a requested change and checks its behavior."

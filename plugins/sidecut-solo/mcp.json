@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "solo": {
+      "command": "node",
+      "args": ["server/index.mjs"],
+      "cwd": "."
+    }
+  }
+}

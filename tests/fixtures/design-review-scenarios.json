@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "about": "Changed-file lists and whether `solo.ts user-facing` must ask Review for a design review. The first case is the real file list of the portfolio redesign that got a code-only review on 2026-11-11.",
+  "cases": [
+    {
+      "id": "portfolio-redesign",
+      "files": [
+        ".claude/settings.json",
+        ".github/workflows/ci.yml",
+        ".gitignore",
+        "AGENTS.md",
+        "BRAND.md",
+        "CLAUDE.md",
+        "DESIGN.md",
+        "PRODUCT.md",
+        "README.md",
+        "ROADMAP.md",
+        "VOICE.md",
+        "docs/development.md",
+        "docs/shipping.md",
+        "lefthook.yml",
+        "solo-workflow.toml",
+        "web/README.md",
+        "web/package-lock.json",
+        "web/bunfig.toml",
+        "web/index.html",
+        "web/knip.json",
+        "web/package.json",
+        "web/public/resume.pdf",
+        "web/public/apple-touch-icon.png",
+        "web/public/favicon-32.png",
+        "web/public/favicon.svg",
+        "web/public/og.png",
+        "web/public/robots.txt",
+        "web/public/sitemap.xml",
+        "web/scripts/prerender.ts",
+        "web/src/App.tsx",
+        "web/src/components/site/about.tsx",
+        "web/src/components/site/approach.tsx",
+        "web/src/components/site/contact.tsx",
+        "web/src/components/site/hero.tsx",
+        "web/src/components/site/project-identity.tsx",
+        "web/src/components/site/projects.tsx",
+        "web/src/components/site/site-footer.tsx",
+        "web/src/components/site/site-header.tsx",
+        "web/src/components/site/work-systems.css",
+        "web/src/components/site/work-systems.tsx",
+        "web/src/components/ui/button.tsx",
+        "web/src/components/ui/separator.tsx",
+        "web/src/content.ts",
+        "web/src/entry-server.tsx",
+        "web/src/index.css",
+        "web/src/lib/utils.ts",
+        "web/tests/docs-layout.test.ts",
+        "web/vercel.json"
+      ],
+      "expected": {
+        "design_review": "needed",
+        "includes": [
+          "web/src/components/site/hero.tsx",
+          "web/src/index.css",
+          "web/src/content.ts",
+          "web/public/resume.pdf",
+          "DESIGN.md",
+          "web/index.html"
+        ],
+        "excludes": [
+          "web/tests/docs-layout.test.ts",
+          ".github/workflows/ci.yml",
+          "README.md",
+          "web/package.json"
+        ]
+      }
+    },
+    {
+      "id": "api-only",
+      "files": [
+        "src/server/routes/signup.ts",
+        "src/lib/db.ts",
+        "package.json",
+        "tests/signup.test.ts"
+      ],
+      "expected": {
+        "design_review": "not needed"
+      }
+    },
+    {
+      "id": "docs-and-tests-only",
+      "files": [
+        "README.md",
+        "docs/setup.md",
+        "docs/diagram.png",
+        "tests/fixtures/page.html",
+        "src/button.test.tsx"
+      ],
+      "expected": {
+        "design_review": "not needed"
+      }
+    },
+    {
+      "id": "copy-only",
+      "files": ["src/locales/en.json"],
+      "expected": {
+        "design_review": "needed",
+        "includes": ["src/locales/en.json"]
+      }
+    },
+    {
+      "id": "swiftui-screen",
+      "files": ["App/Views/SettingsView.swift", "App/Model/Store.swift"],
+      "expected": {
+        "design_review": "needed",
+        "includes": ["App/Views/SettingsView.swift"],
+        "excludes": ["App/Model/Store.swift"]
+      }
+    },
+    {
+      "id": "risky-pages-and-tokens",
+      "files": [
+        "src/pages/login.tsx",
+        "app/checkout/page.tsx",
+        "src/styles/tokens.css",
+        "src/assets/logo.svg",
+        "tailwind.config.ts",
+        "src/theme.ts"
+      ],
+      "expected": {
+        "design_review": "needed",
+        "includes": [
+          "src/pages/login.tsx",
+          "app/checkout/page.tsx",
+          "src/styles/tokens.css",
+          "src/assets/logo.svg",
+          "tailwind.config.ts",
+          "src/theme.ts"
+        ]
+      }
+    },
+    {
+      "id": "native-and-docs-sites",
+      "files": [
+        "ios/App/en.lproj/Localizable.strings",
+        "app/blog/page.mdx",
+        "android/app/src/main/res/layout/activity_main.xml",
+        "docs/index.html",
+        "src/build/Header.tsx"
+      ],
+      "expected": {
+        "design_review": "needed",
+        "includes": [
+          "ios/App/en.lproj/Localizable.strings",
+          "app/blog/page.mdx",
+          "android/app/src/main/res/layout/activity_main.xml",
+          "docs/index.html",
+          "src/build/Header.tsx"
+        ]
+      }
+    },
+    {
+      "id": "messages-in-backend-code",
+      "files": [
+        "server/messages/queue.ts",
+        "src/lib/messages.ts",
+        "build/app.css",
+        "dist/index.html"
+      ],
+      "expected": {
+        "design_review": "not needed"
+      }
+    },
+    {
+      "id": "design-rules-and-messages-folders",
+      "files": [
+        "docs/DESIGN.md",
+        "docs/brand/DESIGN.md",
+        "src/messages/en.json",
+        "messages/fr.json"
+      ],
+      "expected": {
+        "design_review": "needed",
+        "includes": [
+          "docs/DESIGN.md",
+          "docs/brand/DESIGN.md",
+          "src/messages/en.json",
+          "messages/fr.json"
+        ]
+      }
+    },
+    {
+      "id": "plugin-scaffold-templates",
+      "files": [
+        "plugins/sidecut-agentskills/server/data/templates/router/SKILL.md.tmpl",
+        "plugins/sidecut-agentskills/server/data/templates/router/agents/openai.yaml.tmpl",
+        "plugins/sidecut-agentskills/server/data/templates/repo/.gitignore.tmpl",
+        "plugins/sidecut-agentskills/server/data/templates/repo/package.json.tmpl",
+        "plugins/sidecut-agentskills/server/data/templates/plugin/server/src/index.ts.tmpl",
+        "plugins/sidecut-agentskills/server/src/scaffold.ts"
+      ],
+      "expected": {
+        "design_review": "not needed"
+      }
+    },
+    {
+      "id": "markup-templates-still-count",
+      "files": [
+        "app/templates/page.html.tmpl",
+        "app/templates/welcome.txt",
+        "emails/receipt.mjml.tmpl",
+        "emails/welcome.md.tmpl",
+        "content/post.md.tmpl",
+        "locales/en.json.tmpl",
+        "public/widget.js.tmpl",
+        "public/manifest.json.tmpl",
+        "app/templates/.layout.html.tmpl"
+      ],
+      "expected": {
+        "design_review": "needed",
+        "includes": [
+          "app/templates/page.html.tmpl",
+          "app/templates/welcome.txt",
+          "emails/receipt.mjml.tmpl",
+          "emails/welcome.md.tmpl",
+          "content/post.md.tmpl",
+          "locales/en.json.tmpl",
+          "public/widget.js.tmpl",
+          "public/manifest.json.tmpl",
+          "app/templates/.layout.html.tmpl"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Show usage"
+  short_description: "Shows which skills, tools and agents ran, what they cost and whether usage is still being recorded."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-show-usage to show which skills, tools and agents ran, what they cost and whether usage is still being recorded."

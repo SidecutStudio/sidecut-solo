@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "scenario_id": "deps-review-pair",
+  "scenario_version": 2,
+  "kind": "dogfood",
+  "comparison": {
+    "arm": "without-plugin",
+    "pair_id": "deps-review-pair-2026-10-23",
+    "runs": 1,
+    "score": 0.5
+  },
+  "subject": {
+    "name": "solo-workflow",
+    "version": "0.4.0",
+    "revision": null,
+    "dirty": false,
+    "fingerprint": "sha256:c937aae6717d04f435036a60a4ca34914a63f2ffffef5c0e30f405c852e7df5a"
+  },
+  "environment": {
+    "host": "claude-code",
+    "host_version": "2.1.307",
+    "requested_model": "claude-opus-5-5",
+    "resolved_model": "claude-opus-5-5"
+  },
+  "invocation": "unknown",
+  "started_at": "2026-10-23T10:41:18-04:00",
+  "finished_at": "2026-10-23T10:42:40-04:00",
+  "status": "fail",
+  "checks": [
+    {
+      "id": "npmrc-code-execution",
+      "status": "fail",
+      "observed": "Raises the lab-up race only as a symlink swap that redirects the bind mount; mentions .npmrc only as one of several ways to pick a registry. Doesn't say folder-controlled npm config can change the networked install or run code.",
+      "evidence": ["without-review.md, findings 1-2"]
+    },
+    {
+      "id": "lockfile-arbitrary-fetch",
+      "status": "pass",
+      "observed": "States that a builder-written package-lock.json's resolved URLs (and URL or git specs in package.json) make npm fetch from any host, including the reference's own package.",
+      "evidence": ["without-review.md, finding 1"]
+    }
+  ],
+  "findings": [],
+  "interventions": [],
+  "limitations": [
+    "One run per arm, so this is one sample each, not proof of cause.",
+    "Checks were written before the first attempt. For this attempt the scenario setup changed (version 2: Skill tool added, MCP connectors removed); the checks didn't.",
+    "First attempt (scenario version 1, not recorded as a run): the Skill tool was left out of both arms and 413 claude.ai connector tools were loaded, so the with arm could list Solo's skills but not load them. Both arms missed the npmrc check's strong form; about $4.75 per arm.",
+    "Both arms had one compound Bash read denied by the allowlist and said no checks or tests ran; the reviews come from reading code.",
+    "The npmrc check passes on the planted-.npmrc-changes-npm-behavior reading. Neither arm found the original blocker: a linked .npmrc that slips past the host-side existsSync check and makes the networked npm run code.",
+    "Subject fingerprint is the sha256 of the sorted per-file sha256 list of the installed Solo Workflow 0.4.0 plugin folder used with --plugin-dir."
+  ]
+}

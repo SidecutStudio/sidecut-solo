@@ -1,0 +1,10 @@
+{
+  "argv": ["bun", "fixture.ts", "2", "3"],
+  "exit_code": 0,
+  "stdout": "-1\n",
+  "stderr": "",
+  "fixture_sha256": "8fae19a2d3eb537eb61191562f707bf12b78c8363ec814eb81dbfa484b6c989f",
+  "bun_version": "1.4.3",
+  "started_at": "2026-10-22T23:29:16.000Z",
+  "finished_at": "2026-10-22T23:29:16.500Z"
+}

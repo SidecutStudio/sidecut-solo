@@ -1,0 +1,7 @@
+interface:
+  display_name: "Choose approach"
+  short_description: "Compares workable approaches for a grounded recommendation."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-choose-approach to compare workable approaches for a grounded recommendation."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Configure project"
+  short_description: "Maintains Solo settings and repository instruction wiring."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-configure-project to maintain Solo settings and repository instruction wiring."

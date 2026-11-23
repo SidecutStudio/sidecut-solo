@@ -1,0 +1,7 @@
+interface:
+  display_name: "Maintain context"
+  short_description: "Maintains repo-owned context packs and evidence-backed coding standards and review guidance."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-maintain-context to maintain repo-owned context packs and evidence-backed coding standards and review guidance."

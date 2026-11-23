@@ -1,0 +1,22 @@
+base_branch = "main"
+merge = "when-green"
+merge_method = "squash"
+# The gate job in .github/workflows/check.yml requires check and secrets; the ruleset enforces it.
+# check stays listed because sidecut-check's SOLO_REQUIRED rule expects it.
+required_checks = ["gate", "check"]
+worktrees = "when-overlapping"
+# Generated from plugins/sidecut-solo/agents/*.md. Never edit by hand; change the .md source,
+# run node scripts/codex-agents.ts and commit the regenerated files with it.
+protected_paths = [
+  "plugins/sidecut-solo/codex/agents/solo-investigator.toml",
+  ".codex/agents/solo-investigator.toml",
+  "plugins/sidecut-solo/codex/agents/solo-refuter.toml",
+  ".codex/agents/solo-refuter.toml",
+  "plugins/sidecut-solo/codex/agents/solo-reviewer.toml",
+  ".codex/agents/solo-reviewer.toml",
+  "plugins/sidecut-solo/codex/agents/solo-verifier.toml",
+  ".codex/agents/solo-verifier.toml",
+]
+
+[checks]
+check = "npm run check"

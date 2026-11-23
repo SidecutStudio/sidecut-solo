@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "scenario_id": "example-session",
+  "scenario_version": 1,
+  "kind": "session",
+  "subject": {
+    "name": "replace-with-plugin-under-test",
+    "version": null,
+    "revision": null,
+    "dirty": false,
+    "fingerprint": null
+  },
+  "environment": {
+    "host": "replace-with-host",
+    "host_version": null,
+    "requested_model": null,
+    "resolved_model": null
+  },
+  "invocation": "explicit",
+  "skills": [
+    {
+      "name": "replace-with-skill",
+      "version": null,
+      "invocation": "explicit",
+      "helped": [],
+      "skipped": []
+    }
+  ],
+  "started_at": null,
+  "finished_at": null,
+  "status": "not_run",
+  "checks": [
+    {
+      "id": "user-outcome",
+      "status": "not_run",
+      "observed": "Not recorded yet.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "example-finding",
+      "kind": "friction",
+      "severity": "minor",
+      "check_id": "user-outcome",
+      "summary": "Replace with what got in the way, or delete this example. kind is defect, friction or observation; a defect needs a failed check_id and at least one reproduce step.",
+      "evidence": ["A command and its output, a file and line, or a transcript turn."],
+      "reproduce": ["Each step that shows it again, in order."]
+    }
+  ],
+  "interventions": [],
+  "limitations": [
+    "Checks written after the session.",
+    "Single arm: no run without the plugin to compare against."
+  ]
+}

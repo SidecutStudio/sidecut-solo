@@ -1,0 +1,16 @@
+name: Release
+on:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  release:
+    permissions:
+      contents: write
+      checks: read
+    uses: SidecutStudio/sidecut-agentskills/.github/workflows/publish-plugin.yml@80762a8da4e38cba860cfd46152f9aa67f7d17a8
+    with:
+      checked-sha: ${{ github.event.workflow_run.head_sha }}

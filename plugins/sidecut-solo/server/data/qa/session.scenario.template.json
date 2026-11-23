@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "example-session",
+  "version": 1,
+  "title": "Replace with what the session set out to do",
+  "task": "What the user asked for, in their words where possible.",
+  "setup": ["The repo, services and state the session started from."],
+  "allowed_effects": ["What the user allowed the session to change."],
+  "checks": [
+    {
+      "id": "user-outcome",
+      "expected": "An outcome the user cared about.",
+      "method": "How it was confirmed: the command, page or record that shows it."
+    }
+  ]
+}

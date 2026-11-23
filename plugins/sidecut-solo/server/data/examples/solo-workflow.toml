@@ -1,0 +1,15 @@
+base_branch = "main"
+merge = "ask"                    # ask | when-green | never
+merge_method = "squash"          # squash | merge | rebase
+required_checks = ["test", "lint"]
+worktrees = "when-overlapping"   # always | when-overlapping | never
+review = "auto"                  # auto | deep | light
+review_model = "sonnet"          # Claude Code model for standard reviews
+# codex_review_model = "gpt-6-luna"  # Codex model for standard reviews, one the host lists; unset keeps the parent's
+review_effort = "medium"         # low | medium | high, both hosts
+protected_paths = ["dist/", "vendor/"]
+
+[checks]
+test = "npm test"
+lint = "npm exec --no -- biome check ."
+types = "npm exec --no -- tsc --noEmit"

@@ -1,0 +1,33 @@
+{
+  "name": "sidecut-solo",
+  "version": "0.37.1",
+  "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+  "author": {
+    "name": "Sidecut Studio",
+    "url": "https://sidecut.dev"
+  },
+  "homepage": "https://sidecut.dev",
+  "repository": "https://github.com/SidecutStudio/sidecut-solo",
+  "license": "MIT",
+  "keywords": ["engineering", "workflow", "review", "verification"],
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Sidecut Solo",
+    "shortDescription": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+    "longDescription": "Say what you want done and the agent plans, builds, reviews and merges it. Solo merges only the reviewed commit once every required check passes on it, and never deletes work that isn't saved elsewhere.",
+    "developerName": "Sidecut Studio",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write", "MCP"],
+    "websiteURL": "https://sidecut.dev",
+    "defaultPrompt": [
+      "Fix the failing checkout calculation and check it works",
+      "Review this change before it goes live",
+      "Finish the change without skipping required checks"
+    ],
+    "brandColor": "#FF6B00",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

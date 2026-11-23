@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "scenario_id": "merge-guard-friction",
+  "scenario_version": 1,
+  "kind": "session",
+  "subject": {
+    "name": "solo-workflow",
+    "version": "0.14.2",
+    "revision": "f68b894",
+    "dirty": false,
+    "fingerprint": null
+  },
+  "environment": {
+    "host": "claude-desktop-code-tab",
+    "host_version": null,
+    "requested_model": null,
+    "resolved_model": "claude-opus-5-5"
+  },
+  "invocation": "explicit",
+  "skills": [
+    {
+      "name": "solo-workflow:improve-workflow",
+      "version": "0.14.2",
+      "invocation": "explicit",
+      "helped": [
+        "Its order of preference (narrow the rule first, then a script) led to narrowing the hook to the one bypass flag instead of adding another reminder, and step 4 caught Finish's 'never gh pr merge by hand' line, which contradicted the new hook."
+      ],
+      "skipped": [
+        "Loaded after the cause was found and the hook rewritten; references/learning.md was not read."
+      ]
+    },
+    {
+      "name": "solo-workflow:dogfood",
+      "version": "0.14.2",
+      "invocation": "explicit",
+      "helped": ["Session record format and qa-check."],
+      "skipped": [
+        "Not loaded through the Skill tool; SKILL.md was read with sed and the templates followed."
+      ]
+    }
+  ],
+  "started_at": "2026-11-12T16:21:00Z",
+  "finished_at": "2026-11-12T22:00:31Z",
+  "status": "pass",
+  "checks": [
+    {
+      "id": "friction-counted",
+      "status": "pass",
+      "observed": "The merge guard asked 64 times across 31 sessions (app-a 34, app-b 12, app-c 6, app-d 4, app-e 1, other 7). 58 were approved and ran, 6 ran and failed for unrelated reasons, none were declined. 56 of the 64 were long chained commands; about 7 matched merge text inside a heredoc or script being written. The helper logged 85 refusals: push to main 24 (all but 5 from 0.12.x), task record in another worktree 11, unstated blocking findings 9, CI for a different commit 8.",
+      "evidence": [
+        "Transcript hook_success attachments with permissionDecision ask, joined by toolUseID to Bash tool_use and tool_result.",
+        "jq over ~/.local/state/solo-workflow/helper.jsonl grouped by command, reason and version."
+      ]
+    },
+    {
+      "id": "prompts-stopped",
+      "status": "pass",
+      "observed": "The app-e command returned ask from the 0.14.2 hook and nothing (no prompt) from the new one. All 66 commands that got the prompt historically return nothing from the new hook.",
+      "evidence": [
+        "sh old-guard.sh < app-e-input.json -> permissionDecision ask; new hook -> empty output, exit 0.",
+        "Replay over 31 transcripts: {'no prompt': 66}."
+      ]
+    },
+    {
+      "id": "checks-still-required",
+      "status": "pass",
+      "observed": "app-e, app-a, app-b and app-d have an active required-checks ruleset with no bypass actors (current_user_can_bypass: never), so GitHub refuses any merge before checks pass. app-c has no required-checks ruleset. The new hook denies gh pr merge --admin without prompting.",
+      "evidence": [
+        "gh api repos/example-org/<repo>/rulesets and rulesets/<id>.",
+        "App-e command with --admin appended -> permissionDecision deny.",
+        "tests/merge-guard.test.ts: 35 pass."
+      ]
+    },
+    {
+      "id": "helper-refusal-reduced",
+      "status": "pass",
+      "observed": "Agents passed --blocking-findings none 17 times; the helper now reads it as zero. Unstated, empty or malformed counts are still refused.",
+      "evidence": [
+        "rg over transcripts for --blocking-findings values: 310 '0', 17 'none'.",
+        "tests/helpers/delivery.test.ts: 62 pass, including the new 'none' case."
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "guard-ask-in-bypass",
+      "kind": "friction",
+      "severity": "major",
+      "summary": "The merge guard returned permissionDecision ask, which Claude Code shows as a prompt in every permission mode, Bypass included. It never checked CI itself, and the owner approved every answered prompt, so it added a stop without adding safety where GitHub already requires checks.",
+      "check_id": "friction-counted",
+      "evidence": [
+        "Claude Code hooks docs: ask prompts the user; deny blocks in every mode including bypassPermissions.",
+        "58 approved, 0 declined."
+      ],
+      "reproduce": []
+    },
+    {
+      "id": "finish-forbade-gh-merge",
+      "kind": "friction",
+      "severity": "minor",
+      "summary": "Finish said never to run gh pr merge by hand, yet agents did so 64+ times with --match-head-commit, which is safe where a ruleset requires checks. The rule was routinely broken rather than followed.",
+      "check_id": null,
+      "evidence": ["Most guarded commands used gh pr merge --squash --match-head-commit <sha>."],
+      "reproduce": []
+    },
+    {
+      "id": "stdin-hang",
+      "kind": "observation",
+      "severity": "minor",
+      "summary": "Three background rg scans with no path argument waited on stdin forever and were killed; rerun with an explicit path and </dev/null they finished in minutes.",
+      "check_id": null,
+      "evidence": ["ps: rg processes at 0% CPU and 0:00 time after several minutes."],
+      "reproduce": []
+    }
+  ],
+  "interventions": [
+    "The owner asked why the background scans were taking so long, which exposed that they were hung."
+  ],
+  "limitations": [
+    "Checks written after the session.",
+    "Single arm: no run without the plugin to compare against.",
+    "Prompt outcomes are inferred from tool results; a prompt answered 'no' could look like a missing result, but none were missing.",
+    "app-c has no required-checks ruleset, so there a direct merge relies on the agent having read the checks."
+  ]
+}

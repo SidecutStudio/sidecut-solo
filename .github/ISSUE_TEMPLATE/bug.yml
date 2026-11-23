@@ -1,0 +1,31 @@
+name: Bug
+description: Solo did something wrong or failed to run.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked for, what the agent or helper did, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The error or helper output. Remove tokens, private paths and anything you don't want public.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Solo version
+      placeholder: "0.37.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host
+      options: [Claude Code, Codex, Both]
+    validations:
+      required: true

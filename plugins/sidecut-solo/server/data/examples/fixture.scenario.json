@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "cli-addition",
+  "version": 1,
+  "title": "Addition CLI returns the sum",
+  "task": "Invoke the disposable addition CLI with operands 2 and 3 and inspect its output.",
+  "setup": [
+    "Use server/data/examples/fixture.ts as the known-bad subject, in an isolated temporary directory.",
+    "Bun is available; no plugin or model invocation is required."
+  ],
+  "allowed_effects": [
+    "Write the captured stdout, stderr, command, exit code, timestamps and fixture hash into a new local run bundle."
+  ],
+  "checks": [
+    {
+      "id": "sum",
+      "expected": "The command exits 0 and stdout is 5 followed by a newline.",
+      "method": "Run bun fixture.ts 2 3; compare exit code and stdout to the expected result."
+    }
+  ]
+}

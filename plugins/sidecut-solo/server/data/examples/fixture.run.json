@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "scenario_id": "cli-addition",
+  "scenario_version": 1,
+  "kind": "regression",
+  "subject": {
+    "name": "Known-bad addition CLI fixture",
+    "version": "1",
+    "revision": null,
+    "dirty": false,
+    "fingerprint": "sha256:8fae19a2d3eb537eb61191562f707bf12b78c8363ec814eb81dbfa484b6c989f"
+  },
+  "environment": {
+    "host": "Bun CLI on macOS",
+    "host_version": "1.4.3",
+    "requested_model": null,
+    "resolved_model": null
+  },
+  "invocation": "explicit",
+  "started_at": "2026-10-22T23:29:16.000Z",
+  "finished_at": "2026-10-22T23:29:16.500Z",
+  "status": "fail",
+  "checks": [
+    {
+      "id": "sum",
+      "status": "fail",
+      "observed": "Exit 0; stdout '-1\\n'; expected exit 0 and stdout 5 followed by a newline.",
+      "evidence": ["fixture.capture.json: argv, exit_code, stdout, stderr and fixture_sha256"]
+    }
+  ],
+  "findings": [
+    {
+      "id": "subtracts-instead-of-adds",
+      "kind": "defect",
+      "severity": "major",
+      "summary": "The addition CLI subtracts the second operand instead of adding it.",
+      "check_id": "sum",
+      "evidence": [
+        "fixture.capture.json: stdout is -1 followed by a newline",
+        "fixture.ts: prints the difference"
+      ],
+      "reproduce": [
+        "Copy fixture.ts into a disposable directory.",
+        "Run bun fixture.ts 2 3.",
+        "Observe -1 rather than the expected 5."
+      ]
+    }
+  ],
+  "interventions": [],
+  "limitations": [
+    "This exercises the CLI fixture directly, not an installed plugin or automatic skill routing.",
+    "The known defect is intentional. The failing behavioral result is successful detection by the regression case; it is not a passing product result."
+  ]
+}

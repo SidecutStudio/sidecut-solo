@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan change"
+  short_description: "Turns a settled change into ordered steps with checks."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-plan-change to turn a settled change into ordered steps with checks."

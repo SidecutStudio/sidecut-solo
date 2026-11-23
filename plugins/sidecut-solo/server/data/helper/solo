@@ -1,0 +1,7 @@
+#!/bin/sh
+# The bundled helper needs Node.js, not a checkout or installed dependencies.
+if ! command -v node >/dev/null 2>&1; then
+  echo 'Solo needs Node.js 24 or later on PATH. Install Node.js and retry.' >&2
+  exit 127
+fi
+exec node "$(dirname "$0")/solo.mjs" "$@"

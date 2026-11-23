@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "merge-guard-friction",
+  "version": 1,
+  "title": "Find why Solo Workflow keeps stopping agents, and fix what recurs",
+  "task": "Find out why Solo Workflow causes friction for the owner and agents (prompts even in Bypass permissions mode, helper refusals), count what happens most from real usage data, fix each recurring cause with the smallest change, prove the original commands go through, and merge the fix if checks pass, without weakening the rule that merges need required checks.",
+  "setup": [
+    "solo-workflow main at f68b894 (0.14.2), clean.",
+    "Trigger: in app-e, a chained git add/commit/push, gh pr create and gh pr merge --auto --squash got Solo's merge guard prompt in Bypass permissions mode.",
+    "Data: ~/.claude/projects transcripts (482 folders, 2.4 GB), ~/.local/state/solo-workflow/helper.jsonl (85 refusals), the Claude Code usage export.",
+    "Solo Workflow 0.14.2 installed in the Claude desktop app (Code tab), Opus 5.5."
+  ],
+  "allowed_effects": [
+    "Read-only scans of local transcripts, helper logs and GitHub rulesets.",
+    "Branch, commit, push and open a PR in example-org/solo-workflow; merge it when check and secrets pass.",
+    "Write this dogfood record (the brief asked for /solo-workflow:dogfood)."
+  ],
+  "checks": [
+    {
+      "id": "friction-counted",
+      "expected": "The most frequent Solo friction is counted from real data, with how often the owner approved or refused it.",
+      "method": "Python scan of transcript hook attachments joined to their Bash commands and results; jq over helper.jsonl."
+    },
+    {
+      "id": "prompts-stopped",
+      "expected": "Commands that triggered the merge guard's prompt, including the app-e one, now run with no prompt.",
+      "method": "Replay each historical command's PreToolUse input through the old and new hook."
+    },
+    {
+      "id": "checks-still-required",
+      "expected": "Merging still needs required checks: GitHub enforces them, and the one bypass flag is refused.",
+      "method": "gh api rulesets for the repos that hit the prompt; hook replay with --admin added."
+    },
+    {
+      "id": "helper-refusal-reduced",
+      "expected": "A recurring helper refusal with no safety value stops recurring.",
+      "method": "Count of --blocking-findings values in transcripts; delivery test for 'none'."
+    }
+  ]
+}

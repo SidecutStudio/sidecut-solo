@@ -1,0 +1,14 @@
+# Guards on your machine, kept to seconds. Committing tidies the staged files; pushing runs lint,
+# types, Knip, package validation and the generated agent-profile check. The tests run in CI's check
+# job, which gates every pull request; run `npm run check` yourself to run all of it locally.
+pre-commit:
+  jobs:
+    - name: tidy
+      glob: "*.{ts,js,json}"
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+pre-push:
+  jobs:
+    - name: fast check
+      run: bunx biome check . && bunx tsc --noEmit && bunx knip && node scripts/package.ts --verify && node scripts/codex-agents.ts --check
