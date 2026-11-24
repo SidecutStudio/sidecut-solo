@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.39.0] - 2026-11-24
+
+### Added
+
+- Hands-off runs. Say "lfg", "hands off" or "run it end to end" and Solo asks one start question, then takes its recommended option at each decision and lists what it chose in the final report. With `merge = "ask"` it also asks once whether to merge on green or stop at a ready PR. The answers last for that task only. They never change `solo-workflow.toml`, and publishing, spending, scope changes and host gates still stop for you. See `server/data/hands-off.md`.
+- solo-finish-change repairs a failed required check for up to two rounds (`references/ci-repair.md`): it fixes failures this change caused, reruns flaky jobs once, and reports anything pre-existing or out of scope.
+- solo-build-change simplifies its own diff before the full checks and review (`references/simplify.md`).
+- solo-diagnose-problem offers to save one lesson when the cause would probably trap the next reader.
+- `tests/description-overlap.test.ts` fails when two skill descriptions score 0.4 or more on TF-IDF similarity, so they could compete for one request, and when a skill has no trigger eval. Five new evals cover a pasted diff, three near misses (list-work, prevent-mistake and review-change) and the hands-off trigger.
+
 ## [0.38.0] - 2026-11-24
 
 ### Changed

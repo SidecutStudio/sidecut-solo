@@ -84,6 +84,7 @@ const USER_INPUT_POINTERS = [
   'skills/solo-verify-change/SKILL.md',
   'skills/solo-write-copy/SKILL.md',
   'server/data/specification.md',
+  'server/data/hands-off.md',
 ];
 
 test.each(USER_INPUT_POINTERS)('%s points to the packaged user-input guide', async (file) => {

@@ -123,6 +123,8 @@ The never merge policy requires resolving the policy conflict before merging. Wh
 
 Publication permission remains separate from merge permission.
 
+A hands-off task ([hands-off.md](hands-off.md)) takes the recommended option at each decision inside the task and lists what it chose. It asks one start question, and a merge question only under `merge = "ask"`. Both answers are task-scoped. It changes no setting and skips no gate. Publication, spending, deleting unowned work, scope changes and host gates still stop for the user. A failed required check gets at most two repair rounds before it is reported as a blocker.
+
 | Commands | Responsibility |
 | --- | --- |
 | config, inventory, remote-state, merged | Read effective policy and Git facts; only remote-state fetches. |

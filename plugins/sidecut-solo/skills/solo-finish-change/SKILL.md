@@ -35,7 +35,7 @@ Bring the requested work to a verified end state while preserving everything the
    Run `solo user-facing` and use solo-review-design when needed. Record unavailable design coverage and its reason. Open Critical design findings block delivery.
 10. After fixes, review the new head as solo-review-change's after-fixes rules say. Name only workers that actually reviewed it. A same-agent reread remains same-agent, including heads that only merge main.
 11. Push through `solo push` and confirm that the PR head matches. Run `solo checks PR --reviewed-head SHA` for that exact commit.
-12. Require every configured check to pass. Missing, queued, skipped, cancelled, pending or failed checks block merge. Continue independent work while blocked.
+12. Require every configured check to pass. Missing, queued, skipped, cancelled, pending or failed checks block merge. Continue independent work while blocked. When a required check fails, repair it as [ci-repair.md](references/ci-repair.md) describes, at most two rounds.
 13. Inspect automatic release, deployment and publication effects. Resolve existing merge, publication and host permission using `solo authorization`. Follow [delivery.md](references/delivery.md).
 14. Merge through `solo merge` with the exact review record. If repository rules require another merge workflow, follow its equivalent head and check gates.
 15. Confirm the provider reports merged and verify the merged head. Check every requested tag, release, asset, package, deployment and installed update separately.
@@ -45,7 +45,7 @@ Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${
 
 Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
 
-Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. Follow `server/data/user-input.md` from the loaded plugin root.
+Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. In a hands-off task, take merge permission from its start answer in `server/data/hands-off.md`. Follow `server/data/user-input.md` from the loaded plugin root.
 
 Never skip a required check, whatever permission is given. Never overwrite a branch on GitHub or rewrite shared history without explicit permission covering the effect and possible loss.
 
@@ -64,3 +64,4 @@ Describe local checks as local checks. A merge alone proves neither a release no
 | [delivery.md](references/delivery.md) | Apply permission, review and exact-head merge gates. |
 | [recovery.md](references/recovery.md) | Recover uncertain work without repeating effects. |
 | [cleanup.md](references/cleanup.md) | Remove only preserved task-owned resources. |
+| [ci-repair.md](references/ci-repair.md) | Fix a failed required check within the task, with a limit. |

@@ -1,6 +1,6 @@
 ---
 name: solo
-description: "Coordinates project work through the appropriate Solo skills. Use when the user requests an outcome spanning diagnosis, implementation, verification or delivery. Not for specialist platform administration outside the project."
+description: "Coordinates project work through the appropriate Solo skills. Use when the user wants an outcome spanning diagnosis, implementation, verification or delivery, or a hands-off run. Not for platform administration outside the project."
 argument-hint: "[desired outcome]"
 ---
 
@@ -29,6 +29,8 @@ Carry the user's requested outcome through the needed skills. Read the selected 
 | Prevent a recurring project mistake | `solo-prevent-mistake` |
 | Record plugin use or compare controlled runs | `solo-compare-plugin` |
 | See what ran, what it cost and whether usage is recorded | `solo-show-usage` |
+
+When the user asks for a hands-off run ("lfg", "hands off", "run it end to end"), follow `server/data/hands-off.md` from the loaded plugin root before the first skill. It answers decisions for the user and leaves the merge policy and every gate in place.
 
 Reuse settled decisions and permission throughout the task. For a material decision, missing requirement or authorization, follow `server/data/user-input.md` from the loaded plugin root.
 
