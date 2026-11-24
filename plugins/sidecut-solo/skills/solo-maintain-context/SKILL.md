@@ -1,6 +1,6 @@
 ---
 name: solo-maintain-context
-description: "Maintains repo-owned context packs and evidence-backed coding standards and review guidance. Use when asked to create a context pack, scaffold project standards or review docs, refresh those docs from history, or check docs against the code. Not for documenting product features or setting up Solo checks and merge policy (use solo-configure-project for settings)."
+description: "Maintains repo-owned context packs and evidence-backed coding standards and review guidance. Use when asked to create a context pack, scaffold project standards or review docs, refresh those docs from history, or check docs against the code. Not for documenting product features or setting up Solo checks and merge policy (use solo-configure-project)."
 argument-hint: "[context pack <name> | docs scaffold | docs refresh | match reality] [preview]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" docs-check *)

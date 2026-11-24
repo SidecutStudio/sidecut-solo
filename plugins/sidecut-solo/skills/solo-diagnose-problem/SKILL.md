@@ -41,6 +41,8 @@ Provide reproduction steps, commands, useful output, file locations, unverified 
 
 Recommend the next action. Carry the reproduction into an authorized fix as its first regression check.
 
+When the cause would probably trap the next person who reads the code, offer to save one lesson beside that code or in a context pack. Offer one lesson per diagnosis, and update an existing note rather than adding a second. `solo-prevent-mistake` sets where lessons go.
+
 ## References
 
 | Read | When |
