@@ -23,7 +23,8 @@ Set them when starting the reviewer; leaving them out runs it on the parent's mo
 
 - **Standard in Claude Code:** pass `model: <review_model>` (default `sonnet`) and `effort: <review_effort>` to the Agent tool.
 - **Standard in Codex:** pass `reasoning_effort: <review_effort>` to `spawn_agent`, plus `model: <codex_review_model>` when it is set to a model the host lists. Unset, the reviewer keeps the parent's model.
-- **Deep, both hosts:** pass no model and no effort, so the reviewer runs on the parent's model and effort.
+- **Standard in Gemini/Antigravity:** pass `Model: "flash"` (or the user's requested model) to `invoke_subagent`.
+- **Deep, all hosts:** pass no model and no effort (`inherit` in Gemini/Antigravity), so the reviewer runs on the parent's model and effort.
 - **Refuter:** on a standard review, the standard model and effort; on a deep review, no override.
 
 Say which model and effort ran in the review record.

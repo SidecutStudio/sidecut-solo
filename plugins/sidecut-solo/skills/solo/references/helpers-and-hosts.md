@@ -20,7 +20,7 @@ A background worker sends a blocking question to its parent. Do not leave an una
 
 ## Helper path
 
-Resolve the installed plugin root before running its launcher. Claude Code supplies `CLAUDE_PLUGIN_ROOT`; Codex derives it from the loaded skill directory, two directories above.
+Resolve the installed plugin root before running its launcher. Claude Code supplies `CLAUDE_PLUGIN_ROOT`; Codex and Gemini/Antigravity derive it from the loaded skill directory, two directories above (following symlinks when `skills/` is symlinked).
 
 ```bash
 sh "<absolute-plugin-root>/server/data/helper/solo" <command> --repo "<absolute-repo>" [--task <id>] [options]
@@ -77,6 +77,8 @@ Start the reviewer and refuter on the model and effort their review level names,
 Claude Code uses `sidecut-solo:reviewer`, `refuter`, `investigator` and `verifier` plugin agents; the Agent tool takes `model` and `effort`.
 
 Codex uses installed `solo_reviewer`, `solo_refuter`, `solo_investigator` and `solo_verifier` profiles when available. Otherwise pass the matching agent instructions to a native worker. The profiles carry no model or effort, so pass `model` and `reasoning_effort` on `spawn_agent`; use only model names the host lists.
+
+Gemini/Antigravity uses `invoke_subagent` with `TypeName` set to `reviewer`, `refuter`, `investigator` or `verifier` (or passes the matching `agents/<role>.md` instructions to `self` when plugin agents are not registered), using `Model` (`inherit`, `flash_lite`, `flash`, or `pro`).
 
 Read-only roles receive no publication or destructive permission. Read-only instructions and tool restrictions are not a sandbox guarantee; shell tools can have effects.
 

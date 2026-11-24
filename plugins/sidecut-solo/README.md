@@ -2,7 +2,7 @@
 
 Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.
 
-Say "fix signup and get it merged" and it finds the cause, makes the fix, gets it reviewed and merges it once the checks pass, stopping only when a decision is yours. It works the same way in Claude Code and Codex.
+Say "fix signup and get it merged" and it finds the cause, makes the fix, gets it reviewed and merges it once the checks pass, stopping only when a decision is yours. It works the same way in Claude Code and Codex, with Gemini/Antigravity guidance in the skill references.
 
 ## What it does
 
@@ -94,7 +94,7 @@ To teach the agent your codebase, ask `solo-maintain-context` to scaffold contex
 
 Solo is mostly instructions. The parts that execute are:
 
-- **The helper**, `server/data/helper/solo`: one bundled Node.js file with no dependencies to install. It reads Git and GitHub with your existing sign-in and does the pushes, merges and deletions the skills ask for, after its own checks.
+- **The helper**, `server/data/helper/solo`: a small shell launcher that runs the bundled Node.js file (`solo.mjs`) with no dependencies to install. It reads Git and GitHub with your existing sign-in and does the pushes, merges and deletions the skills ask for, after its own checks.
 - **A read-only MCP server** with views of settings, work state, PR checks, merged branches, user-facing changes and usage.
 - **Two hooks.** A merge guard refuses `gh pr merge --admin` in projects that have Solo settings; it guards against mistakes and isn't a security boundary. The other writes the skill log below.
 
