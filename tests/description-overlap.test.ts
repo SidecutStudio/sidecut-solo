@@ -77,7 +77,7 @@ test('every skill has a trigger eval that names it', async () => {
     for (const grader of await readdir(join(evals, dir.name, 'graders')).catch(() => [])) {
       const text = await readFile(join(evals, dir.name, 'graders', grader), 'utf8');
       const name = text.match(/sidecut-solo:(solo[a-z-]*)/)?.[1];
-      if (name && /min: [1-9]/.test(text)) fired.add(name);
+      if (name && /^min: [1-9]/m.test(text)) fired.add(name);
     }
   }
   const skills = (await readdir(join(PLUGIN, 'skills'))).sort();
