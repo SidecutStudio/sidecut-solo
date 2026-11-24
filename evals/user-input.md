@@ -1,4 +1,4 @@
-# Owner input in Sidecut Solo
+# User input in Sidecut Solo
 
 Use scratch repositories and fresh sessions with the branch loaded for one session. Run the Claude and Codex cases in their named modes. Observe the question channel and what the agent does after the reply. Simulate delivery and spending without changing real services.
 

@@ -45,7 +45,7 @@ Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${
 
 Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
 
-Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. Follow `server/data/owner-input.md` from the loaded plugin root.
+Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. Follow `server/data/user-input.md` from the loaded plugin root.
 
 Never skip a required check, whatever permission is given. Never overwrite a branch on GitHub or rewrite shared history without explicit permission covering the effect and possible loss.
 

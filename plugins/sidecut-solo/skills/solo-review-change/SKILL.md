@@ -48,7 +48,7 @@ List findings from most serious to least serious, checks and results, uncovered 
 
 Blocker and major findings block delivery. Minor findings remain recommendations unless repository policy or the user makes them blocking.
 
-For an authorized follow-through, ask only if a fix depends on a material owner decision or missing permission. Follow `server/data/owner-input.md` from the loaded plugin root. A review alone finishes with findings or a verdict. No findings means none found in the reviewed scope, and creates no delivery permission.
+For an authorized follow-through, ask only if a fix depends on a material owner decision or missing permission. Follow `server/data/user-input.md` from the loaded plugin root. A review alone finishes with findings or a verdict. No findings means none found in the reviewed scope, and creates no delivery permission.
 
 ## References
 

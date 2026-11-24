@@ -22,7 +22,7 @@ Keep project settings accurate without turning routine maintenance into first-ti
 4. Exclude optional, manual, deployment-only and non-PR jobs. If protection is unavailable, use explicit repository policy and observed PR checks.
 5. Leave uncertain facts unset and explain why. A workflow job identifier alone does not prove a required check name.
 6. Identify protected generated and vendored files. Record their source generator; generated output may change only through that generator.
-7. Show one comparison table containing saved values, observed values and instruction changes. Ask only unresolved policy decisions that change the setup. Follow `server/data/owner-input.md` from the loaded plugin root.
+7. Show one comparison table containing saved values, observed values and instruction changes. Ask only unresolved policy decisions that change the setup. Follow `server/data/user-input.md` from the loaded plugin root.
 8. Reuse existing merge and worktree choices. Without a preference, use `merge = "ask"` and `worktrees = "when-overlapping"`.
 9. Update only changed settings in `solo-workflow.toml` and preserve comments. Follow [project-settings.md](examples/project-settings.md).
 10. Create `solo-workflow.local.toml` only on request and ignore it in Git. Never copy personal overrides into committed settings.

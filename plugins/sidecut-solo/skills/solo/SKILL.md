@@ -30,7 +30,7 @@ Carry the user's requested outcome through the needed skills. Read the selected 
 | Record plugin use or compare controlled runs | `solo-compare-plugin` |
 | See what ran, what it cost and whether usage is recorded | `solo-show-usage` |
 
-Reuse settled decisions and permission throughout the task. For a material decision, missing requirement or authorization, follow `server/data/owner-input.md` from the loaded plugin root.
+Reuse settled decisions and permission throughout the task. For a material decision, missing requirement or authorization, follow `server/data/user-input.md` from the loaded plugin root.
 
 When several routes fit, choose the smallest chain that completes the request. Read [orchestration.md](references/orchestration.md) for handoffs and [helpers-and-hosts.md](references/helpers-and-hosts.md) for host behavior.
 

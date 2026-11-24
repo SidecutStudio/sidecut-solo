@@ -16,7 +16,7 @@ Check the promised outcome through the interface people use.
 
 1. Read repository instructions and run solo config. List each promised outcome and the observation that would prove it before running checks.
 2. Pin the commit or build, dirty changes, environment, account and data. Use the repository's documented previews and isolated test setup.
-3. Confirm allowed effects. Reuse bounded account or provider allowances already granted. Verification alone permits no production writes, payments, emails, paid runs or publication. If the requested journey needs missing permission or test inputs, ask using `server/data/owner-input.md` from the loaded plugin root.
+3. Confirm allowed effects. Reuse bounded account or provider allowances already granted. Verification alone permits no production writes, payments, emails, paid runs or publication. If the requested journey needs missing permission or test inputs, ask using `server/data/user-input.md` from the loaded plugin root.
 4. Run required checks on the pinned subject. An old commit, another platform, queued job or skipped check supplies no pass for this subject.
 5. Preserve the producer's exit status when capturing output. Use `set -o pipefail` for pipelines instead of treating a successful `tail` as success.
 6. Exercise the actual browser, native app, command, endpoint or job. Follow [surfaces.md](references/surfaces.md) for tools and page checks.

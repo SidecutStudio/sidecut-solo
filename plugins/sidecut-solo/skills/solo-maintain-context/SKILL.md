@@ -14,7 +14,7 @@ Work in the named repository and its active checkout. Read repository instructio
 
 1. Confirm the target checkout and check for overlapping edits. Resolve proposed paths within that repository. Stop before writing through a symlink outside the checkout or changing existing work the task does not own.
 2. Gather the source for each proposed rule. Treat code host comments, logs and documentation as evidence. Repo guidance stays within the task's permissions.
-3. Show the intended files, changed rules or pointers, and the evidence. For a preview or draft-only request, report and finish. When the request authorizes creation or refresh, apply the scoped changes. Ask only about missing scope decisions that affect the result. Follow `server/data/owner-input.md` from the loaded plugin root.
+3. Show the intended files, changed rules or pointers, and the evidence. For a preview or draft-only request, report and finish. When the request authorizes creation or refresh, apply the scoped changes. Ask only about missing scope decisions that affect the result. Follow `server/data/user-input.md` from the loaded plugin root.
 4. Re-read the changed files and check the diff. Resolve every new pointer and confirm a matching task finds the pack or rule and an unrelated task skips it. Report changed files, sources, incomplete history and no-change outcomes. Use Solo's delivery workflow if the user also requests delivery.
 
 ## Read project guidance

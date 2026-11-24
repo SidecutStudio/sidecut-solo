@@ -38,7 +38,7 @@ Change protected generated files through their source and documented generator. 
 
 For trivial edits, make the edit and check it without adding a plan, task record or test suite.
 
-Ask only for unresolved scope, design or permission decisions. Follow `server/data/owner-input.md` from the loaded plugin root. Required checks remain mandatory.
+Ask only for unresolved scope, design or permission decisions. Follow `server/data/user-input.md` from the loaded plugin root. Required checks remain mandatory.
 
 Delegate independent pieces only when authorized. Give each worker separate ownership and the accepted plan.
 

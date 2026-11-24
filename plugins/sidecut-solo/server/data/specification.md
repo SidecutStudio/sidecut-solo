@@ -8,7 +8,7 @@ Solo helps agents plan, build, review, and deliver software changes. It selects 
 
 A request for research, planning, diagnosis or review stays inside that scope unless implementation or delivery is also authorized.
 
-Reuse settled decisions and task permission. Use the packaged [owner-input.md](owner-input.md) for material decisions, missing requirements, actionable recommendations and permission. The host controls which question and approval flows a skill can use.
+Reuse settled decisions and task permission. Use the packaged [user-input.md](user-input.md) for material decisions, missing requirements, actionable recommendations and permission. The host controls which question and approval flows a skill can use.
 
 Prepare a concrete reviewable result before asking for delivery permission. Explain the action, effects, cost and recovery where relevant.
 

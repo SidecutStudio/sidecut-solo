@@ -12,7 +12,7 @@ Preserve unknown work and unique copies. Never skip required checks. Never overw
 
 If another session owns a worktree, use a separate branch and worktree. Do not take ownership because Git reports the branch is already in use.
 
-Ask before expanding scope, dropping requested outcomes or making unsettled product decisions. Ask before new spending, access or irreversible effects unless the user already authorized them. Follow `server/data/owner-input.md` from the loaded plugin root.
+Ask before expanding scope, dropping requested outcomes or making unsettled product decisions. Ask before new spending, access or irreversible effects unless the user already authorized them. Follow `server/data/user-input.md` from the loaded plugin root.
 
 Do the reversible preparation before requesting a real approval. Explain the concrete action, cost and consequences, then carry out authorized steps yourself.
 
