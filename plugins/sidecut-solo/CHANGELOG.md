@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.37.2] - 2026-11-24
+
+### Changed
+
+- `solo`, `solo-review-change`, and `solo-finish-change` references document Gemini/Antigravity compatibility: resolving the plugin root from symlinked `skills/`, delegating via `invoke_subagent` (`TypeName`, `Model`), and worktree cleanup behavior.
+
 ## [0.37.1] - 2026-11-23
 
 ### Changed
