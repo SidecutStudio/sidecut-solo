@@ -40,4 +40,4 @@ A worktree Claude Code created for this session, under `.claude/worktrees/`, bel
 2. Call `ExitWorktree` with `keep`. Its `remove` action also deletes the branch.
 3. From the original checkout, run `git worktree remove PATH`, with no option that discards changes.
 
-If `ExitWorktree` is unavailable or refuses, or git refuses for any reason, keep the worktree. Name it in the final report as left for the user to remove. Do the same in hosts without a way to leave the session's worktree, such as Claude Desktop and Codex.
+If `ExitWorktree` is unavailable or refuses, or git refuses for any reason, keep the worktree. Name it in the final report as left for the user to remove. Do the same in hosts without a way to leave the session's worktree, such as Claude Desktop, Codex and Gemini/Antigravity.
