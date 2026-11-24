@@ -11,7 +11,7 @@ import { SOLO_SKILL_ALIASES } from './usage.ts';
 /** Earlier skill names with no `solo-` prefix, from before the 0.10 rename. */
 const BARE_SKILLS: Record<string, string> = {
   dogfood: 'solo-compare-plugin',
-  'improve-workflow': 'solo-improve-workflow',
+  'improve-workflow': 'solo-prevent-mistake',
   'design-review': 'solo-review-design',
   troubleshoot: 'solo-diagnose-problem',
   investigate: 'solo-diagnose-problem',
@@ -24,7 +24,7 @@ const BARE_SKILLS: Record<string, string> = {
   verify: 'solo-verify-change',
   finish: 'solo-finish-change',
   setup: 'solo-configure-project',
-  status: 'solo-check-status',
+  status: 'solo-list-work',
 };
 /** Bare names that are ordinary words, so reported only when written as a skill. */
 const COMMON_WORDS = new Set([

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.38.0] - 2026-11-24
+
+### Changed
+
+- Two skills have clearer names. `solo-check-status` is now `solo-list-work`, because elsewhere in the marketplace `*-check-status` means "is the MCP server running". `solo-improve-workflow` is now `solo-prevent-mistake`, matching its router row. The skill log and `solo retired-names` both still recognize the old names.
+- Solo follows Sidecut Agentskills 2.6.1. The question guide is now `server/data/user-input.md` and adds Offer follow-ups. The plugin ships Antigravity's `.antigravity-plugin/plugin.json`, `mcp_config.json` and `hooks.json`. The skill-log hook also counts Antigravity skill reads.
+- How to read context packs and standards before planning, building or reviewing now lives in `server/data/project-guidance.md`, and plan-change, build-change and review-change point to it. `solo-maintain-context` is back to one Steps list and has a Done when.
+- `solo-write-copy` has a Done when and a shorter description. `solo-review-change` now also fires on a diff pasted inline or a "safe to merge?" question. `solo-compare-plugin`'s description now leads with the verb in its name: "Compares plugin sessions and controlled runs from recorded evidence."
+
 ## [0.37.3] - 2026-11-24
 
 ### Changed

@@ -16,7 +16,7 @@ Return findings to build, then verify and review the changed head. An earlier re
 
 Use `solo-finish-change` for authorized completion and merging. Required checks must pass on the current PR head.
 
-For unfinished work, start with `solo-check-status` to establish ownership and prevent loss, then finish what is authorized.
+For unfinished work, start with `solo-list-work` to establish ownership and prevent loss, then finish what is authorized.
 
 For release inspection, check status and review outgoing changes without editing unless fixes are requested.
 

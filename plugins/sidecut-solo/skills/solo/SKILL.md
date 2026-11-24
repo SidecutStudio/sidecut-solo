@@ -23,10 +23,10 @@ Carry the user's requested outcome through the needed skills. Read the selected 
 | Write or fix words people read, or make text stop sounding like AI | `solo-write-copy` |
 | Review code and challenge findings | `solo-review-change` |
 | Complete, merge and clean up authorized work | `solo-finish-change` |
-| Inspect unfinished work without changing it | `solo-check-status` |
+| Inspect unfinished work without changing it | `solo-list-work` |
 | Set project checks and delivery settings | `solo-configure-project` |
 | Create a context pack, scaffold standards or refresh project review docs | `solo-maintain-context` |
-| Prevent a recurring project mistake | `solo-improve-workflow` |
+| Prevent a recurring project mistake | `solo-prevent-mistake` |
 | Record plugin use or compare controlled runs | `solo-compare-plugin` |
 | See what ran, what it cost and whether usage is recorded | `solo-show-usage` |
 

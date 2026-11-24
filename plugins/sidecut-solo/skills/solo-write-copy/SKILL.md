@@ -1,6 +1,6 @@
 ---
 name: solo-write-copy
-description: "Writes words people read so they're specific, sound like their author and carry no AI-writing tells. Use when writing or rewriting a page, product copy, a README, release notes, a PR description, an email, a post or a repo's agent docs, or when text reads like AI, generic or flat. Not for critiquing a rendered screen (use solo-review-design) or picking a page direction (use solo-choose-approach)."
+description: "Writes words people read so they're specific, sound like their author and carry no AI-writing tells. Use when writing or rewriting a page, a README, release notes, an email, a post or a repo's agent docs, or when text reads like AI, generic or flat. Not for critiquing a rendered screen (use solo-review-design) or picking a page direction (use solo-choose-approach)."
 argument-hint: "[text, file or page]"
 ---
 
@@ -37,3 +37,7 @@ Skip leading with the most impressive part, delivering a rendered page and savin
 - Never invent results, users, quotes, endorsements, counts or access.
 - Hard limits never bend, voice guide or not: privacy, secrets, legal and employer rules, required notices. If the user asks for something that breaks one, say which and offer what fits.
 - Within those limits, the user's own words win.
+
+## Done when
+
+The words are delivered where they'll live, every scan flag is fixed or kept on purpose, names, numbers, commands and links match their source, and the user's verdicts are in the voice guide.

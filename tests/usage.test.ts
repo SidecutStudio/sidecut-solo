@@ -153,7 +153,7 @@ test('an idle gap ends a skill run, and the Solo section names unused skills and
   const text = soloReport(records, [], new Date(0));
   expect(text).toContain('sessions using Solo: 2');
   expect(text).toContain(
-    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-check-status, solo-review-change, solo-review-design, solo-verify-change, solo-finish-change, solo-configure-project, solo-improve-workflow, solo-compare-plugin, solo-show-usage, solo-write-copy',
+    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-list-work, solo-review-change, solo-review-design, solo-verify-change, solo-finish-change, solo-configure-project, solo-prevent-mistake, solo-compare-plugin, solo-show-usage, solo-write-copy',
   );
   expect(text).toContain('only the router started (it may have done the work itself): 1');
   expect(text).toContain('desktop app reports typed');
@@ -235,13 +235,14 @@ test('Solo coverage normalizes historical skills across all install namespaces w
     ['solo-plan', 'solo-plan-change'],
     ['solo-build', 'solo-build-change'],
     ['solo-troubleshoot', 'solo-diagnose-problem'],
-    ['solo-status', 'solo-check-status'],
+    ['solo-status', 'solo-list-work'],
     ['solo-review', 'solo-review-change'],
     ['solo-design-review', 'solo-review-design'],
     ['solo-verify', 'solo-verify-change'],
     ['solo-finish', 'solo-finish-change'],
     ['solo-setup', 'solo-configure-project'],
-    ['solo-improve-workflow', 'solo-improve-workflow'],
+    ['solo-improve-workflow', 'solo-prevent-mistake'],
+    ['solo-check-status', 'solo-list-work'],
     ['solo-dogfood', 'solo-compare-plugin'],
   ];
   for (const namespace of ['solo-workflow', 'sidecut-solo-workflow', 'sidecut-solo']) {

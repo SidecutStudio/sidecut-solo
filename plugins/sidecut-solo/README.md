@@ -20,15 +20,15 @@ The `solo` skill routes each request to the right step, or you can name one:
 | --- | --- |
 | `solo` | Coordinates project work through the appropriate Solo skills. |
 | `solo-build-change` | Implements a requested change and checks its behavior. |
-| `solo-check-status` | Shows unfinished work and what could be lost. |
 | `solo-choose-approach` | Compares workable approaches for a grounded recommendation. |
-| `solo-compare-plugin` | Records evidence from plugin sessions and controlled comparisons. |
+| `solo-compare-plugin` | Compares plugin sessions and controlled runs from recorded evidence. |
 | `solo-configure-project` | Maintains Solo settings and repository instruction wiring. |
 | `solo-diagnose-problem` | Investigates a failure or performance problem using evidence. |
 | `solo-finish-change` | Completes checks, delivery and cleanup under repository rules. |
-| `solo-improve-workflow` | Removes the cause of a recurring project mistake. |
+| `solo-list-work` | Shows unfinished work and what could be lost. |
 | `solo-maintain-context` | Maintains repo-owned context packs and evidence-backed coding standards and review guidance. |
 | `solo-plan-change` | Turns a settled change into ordered steps with checks. |
+| `solo-prevent-mistake` | Removes the cause of a recurring project mistake. |
 | `solo-research-topic` | Finds outside facts with current sources. |
 | `solo-review-change` | Reviews a change for demonstrated defects and delivery risks. |
 | `solo-review-design` | Reviews rendered screens for concrete design improvements. |

@@ -1,7 +1,7 @@
 ---
 type: tool_used
 tool: Skill
-input_match: "sidecut-solo:solo-check-status"
+input_match: "sidecut-solo:solo-prevent-mistake"
 min: 1
 arm: with-only
 ---
