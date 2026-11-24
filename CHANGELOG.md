@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.37.3] - 2026-11-24
+
+### Changed
+
+- Refreshed `README.md`, `AGENTS.md`, `SECURITY.md`, `lefthook.yml`, and `server/data/specification.md` to match current behavior (Node.js/npm hooks in `lefthook.yml`, on-by-default skill log, `solo.mjs` launcher wording, skill-log hook in `SECURITY.md`, and Gemini/Antigravity support).
+
 ## [0.37.2] - 2026-11-24
 
 ### Changed

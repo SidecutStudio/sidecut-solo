@@ -12,6 +12,7 @@ Report it privately to Sidecut Studio through a GitHub security advisory on Side
 
 Sidecut Solo is mostly instructions for an agent. The parts that run on your machine are:
 
-- **Node helper:** The bundled helper, server/data/helper/solo.mjs, runs on Node.js 24 or later through its launcher. It needs no dependency installation. It uses Git and authenticated GitHub CLI with your existing permissions. Its run command executes the requested command and records the result. The codex-agents --install command copies profiles into the project's .codex/agents/.
+- **Node helper:** The bundled helper, `plugins/sidecut-solo/server/data/helper/solo.mjs`, runs on Node.js 24 or later through its `solo` launcher. It needs no dependency installation. It uses Git and authenticated GitHub CLI with your existing permissions. Its `run` command executes the requested command and records the result. The `codex-agents --install` command copies profiles into the project's `.codex/agents/`.
 - **`gh`:** used for PR checks and merges, only when a skill asks for them.
 - **Merge guard hook:** `plugins/sidecut-solo/hooks/pre-tool-use-merge-guard.mjs`, a Node.js script that Claude Code and Codex run before each shell command. In a repo with `solo-workflow.toml` it refuses `gh pr merge --admin` and never asks you; it never runs the command itself. Required checks are enforced by GitHub's ruleset or branch protection, not by the hook. It guards against mistakes and is not a security boundary.
+- **Skill usage log hook:** `plugins/sidecut-solo/hooks/post-tool-use-skill-log.mjs`, a Node.js script that appends skill name, plugin, host, timestamp, and project directory to `~/.claude/sidecut-skill-log.jsonl` when a skill runs (turn off with `SIDECUT_SKILL_LOG=0` or `DO_NOT_TRACK=1`).

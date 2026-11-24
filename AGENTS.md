@@ -11,7 +11,7 @@ Sidecut Solo is an engineering workflow plugin for AI coding agents. Preserve it
 | `npm run types` | Check TypeScript types. |
 | `npm run package` | Build the local installable archive without publishing. |
 | `npm run check` | Run formatting, types, style, tests, package and generated-output checks. |
-| `npm run build` | Build the MCP server, dashboard and role profiles. |
+| `npm run build` | Build the MCP server, dashboard, role profiles and helper bundle (`solo.mjs`). |
 | `npm run style` | Check the Sidecut plugin standard. |
 | `npm run eval` | Run behavioural evals with Claude Code (explicit, may use model credits). |
 
