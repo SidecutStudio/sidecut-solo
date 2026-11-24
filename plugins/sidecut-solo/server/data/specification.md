@@ -72,7 +72,7 @@ The helper has no runtime dependencies. Resolve installed files from the plugin 
 
 The Node MCP bundle is server/index.mjs, with TypeScript source in server/src. Bundle dependencies and generated notices remain installed and checked for drift.
 
-The host configurations are .mcp.json and mcp.json. Claude Code starts from the project; Codex supplies an explicit project repo where required.
+The host configurations are `.mcp.json`, `mcp.json`, and `mcp_config.json` (in Antigravity/Gemini wrappers). Claude Code starts from the project; Codex supplies an explicit project repo where required; Gemini/Antigravity resolves the plugin root two directories above the loaded `SKILL.md` (following symlinks when `skills/` is symlinked).
 
 ## Read-only tools
 
@@ -101,7 +101,7 @@ The merge guard rejects admin merges that would skip required checks in configur
 
 A malformed or unavailable hook input fails open without becoming merge permission. Helper gates remain responsible for delivery checks and permission.
 
-The standard skill log is opt-in and local. The retained usage receiver, dashboard and helper refusal logging remain supported by explicit comparison scope.
+The standard skill log is local and on by default (opt out via `SIDECUT_SKILL_LOG=0`, `DO_NOT_TRACK=1`, or CI). The retained usage receiver, dashboard and helper refusal logging remain supported by explicit comparison scope.
 
 Reviewer, refuter, investigator and verifier instructions live in agents. Generated Codex profiles use solo role prefixes and remain synchronized with those instructions.
 
@@ -109,7 +109,7 @@ Install missing project profiles only on request. Never overwrite an existing pr
 
 Native role instructions do not promise filesystem isolation. Check actual host capabilities before claiming parity gaps or enforcement.
 
-Claude deep review uses server/data/workflows/review-change.js. Codex uses native roles for equivalent area, interactions and refutation coverage.
+Claude deep review uses server/data/workflows/review-change.js. Codex uses native roles and Gemini/Antigravity uses `invoke_subagent` (`TypeName` reviewer, refuter, investigator, verifier) for equivalent area, interactions and refutation coverage.
 
 ## Settings and helper commands
 
@@ -158,7 +158,7 @@ After direct edits, resume and reconcile the observed changes and checks before 
 
 Verified completed merge records, and merge records whose merge never began, do not block later merges through stale snapshots. A build checkpoint reopens work deliberately.
 
-Cleanup requires task ownership, no unique dirty or ignored data and commits preserved on a named ref. A session owns the worktree its host created for it, so after a proven merge it removes that worktree and keeps the branch. Squash merging alone does not preserve original commit ancestry.
+Cleanup requires task ownership, no unique dirty or ignored data and commits preserved on a named ref. A session owns the worktree its host created for it, so after a proven merge it removes that worktree and keeps the branch; hosts without a way to leave the session's worktree (Claude Desktop, Codex, and Gemini/Antigravity) keep it and name it in the final report. Squash merging alone does not preserve original commit ancestry.
 
 Delete branches only within requested cleanup and after proving their preservation. A merge record proves neither release nor deployment.
 
@@ -168,7 +168,7 @@ Pin exact base and head SHAs or identify the dirty diff and fingerprint. Read ca
 
 Validate findings and try to disprove serious claims. Size review to the change: light is a same-agent pass, standard is one independent reviewer on a cheaper model at the configured effort, deep uses the parent model and effort. The helper suggests the level from the changed paths and size; skills may raise it, never lower it. Label same-agent coverage honestly.
 
-Both hosts set the reviewer's model and effort explicitly. Claude Code passes `review_model` and `review_effort`; Codex passes `review_effort` as `reasoning_effort` and `codex_review_model` when set. The review record names what ran.
+Each host sets the reviewer's model and effort explicitly: Claude Code passes `review_model` and `review_effort`; Codex passes `review_effort` as `reasoning_effort` and `codex_review_model` when set; Gemini/Antigravity passes `Model: "flash"` on standard review and `inherit` on deep. The review record names what ran.
 
 Every changed head requires another review. Scoped re-review requires a committed review below the deep level, preserved ancestry and an unchanged merge base.
 
