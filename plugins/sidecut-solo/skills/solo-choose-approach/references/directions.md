@@ -12,7 +12,7 @@ The user chooses by looking. Copy alone in chat is never the draft of a new page
 4. Build two or three directions as rendered pages, each from a different idea in the research. Use the same words and real images in each, so the choice is about look and identity.
 5. Check each direction at phone and desktop widths and fix what the check finds before showing it.
 6. Follow the shared visual-report guidance named in `solo-choose-approach`. Show the first screen of each direction at matched scale, link each full draft, and include the words, the research and one recommendation.
-7. Once the drafts are visible, ask which direction to build. Follow `server/data/owner-input.md` from the loaded plugin root. Build only the direction the user picks.
+7. Once the drafts are visible, ask which direction to build. Follow `server/data/user-input.md` from the loaded plugin root. Build only the direction the user picks.
 
 ## Done when
 

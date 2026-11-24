@@ -11,7 +11,7 @@ Turn an open question into a recommendation grounded in this project. Keep settl
 ## Steps
 
 1. Read the request, current product, code and guidance. Establish who needs the change and what outcome would make it worthwhile.
-2. Ask only about a missing decision that changes the choice. Follow `server/data/owner-input.md` from the loaded plugin root. Use `solo-research-topic` when outside facts decide the answer.
+2. Ask only about a missing decision that changes the choice. Follow `server/data/user-input.md` from the loaded plugin root. Use `solo-research-topic` when outside facts decide the answer.
 3. Compare two or three materially different approaches that fit the constraints. Include the smallest reversible trial when one exists.
 4. Explain each approach's benefit, cost, risk and future limits, including what it asks of the user: reviews, approvals, decisions. Don't guess how long anything takes.
 5. Find the premise that would defeat the leading approach. Read [premise-checks.md](references/premise-checks.md) and make the smallest real observation that could disprove it.

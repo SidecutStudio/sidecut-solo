@@ -1,6 +1,6 @@
 ---
 name: solo-write-copy
-description: "Writes words people read so they're specific, sound like their author and carry no AI-writing tells. Use when writing or rewriting a page, product copy, a README, release notes, a PR description, an email, a post or a repo's agent docs, or when text reads like AI, generic or flat. Not for critiquing a rendered screen (use solo-review-design) or picking a page direction (use solo-choose-approach)."
+description: "Writes words people read so they're specific, sound like their author and carry no AI-writing tells. Use when writing or rewriting a page, a README, release notes, an email, a post or a repo's agent docs, or when text reads like AI, generic or flat. Not for critiquing a rendered screen (use solo-review-design) or picking a page direction (use solo-choose-approach)."
 argument-hint: "[text, file or page]"
 ---
 
@@ -10,9 +10,9 @@ Write words a stranger reads to the end: built from the subject's real specifics
 
 ## Steps
 
-1. Know the reader and what the words should get them to do. For new text with no stated purpose, ask once what it's for, as `server/data/owner-input.md` from the loaded plugin root describes.
+1. Know the reader and what the words should get them to do. For new text with no stated purpose, ask once what it's for, as `server/data/user-input.md` from the loaded plugin root describes.
 2. Read the project's voice guide (`VOICE.md`, or whatever its `AGENTS.md` points to), including its approved and rejected lines.
-3. Gather the real material from the repo that owns the subject: what it does today, numbers and where they were counted, names, screenshots. If a point has no fact behind it, ask for it as `server/data/owner-input.md` describes, or drop the point.
+3. Gather the real material from the repo that owns the subject: what it does today, numbers and where they were counted, names, screenshots. If a point has no fact behind it, ask for it as `server/data/user-input.md` describes, or drop the point.
 4. Write it. Lead with what the thing does for the reader and its most impressive part, shown with a specific. For a page, decide what the reader needs and in what order before writing sentences; cutting or moving a section often beats rewriting it. When several items of one kind sit side by side, such as cards, stories or blurbs, write down the shape they share (opening move, order, ending) and rewrite until no two follow it. Read [lessons.md](references/lessons.md) for what the user has already corrected.
 5. Run `node "PLUGIN_ROOT/skills/solo-write-copy/scripts/scan-copy.mjs" FILE` (or pipe the text in; for a page, scan the built HTML). Each flag is a place to look: fix it by restating the point, or keep it when it's deliberate.
 6. Check names, numbers, commands and links against their source once more. A command a reader will copy must work.
@@ -37,3 +37,7 @@ Skip leading with the most impressive part, delivering a rendered page and savin
 - Never invent results, users, quotes, endorsements, counts or access.
 - Hard limits never bend, voice guide or not: privacy, secrets, legal and employer rules, required notices. If the user asks for something that breaks one, say which and offer what fits.
 - Within those limits, the user's own words win.
+
+## Done when
+
+The words are delivered where they'll live, every scan flag is fixed or kept on purpose, names, numbers, commands and links match their source, and the user's verdicts are in the voice guide.

@@ -1,6 +1,6 @@
 ---
 name: solo-show-usage
-description: "Shows which skills, tools and agents ran, what they cost and whether usage is still being recorded. Use when the user asks about usage, telemetry, cost or which skills and plugins get used. Not for fixing a repeated mistake (use solo-improve-workflow)."
+description: "Shows which skills, tools and agents ran, what they cost and whether usage is still being recorded. Use when the user asks about usage, telemetry, cost or which skills and plugins get used. Not for fixing a repeated mistake (use solo-prevent-mistake)."
 argument-hint: "[days]"
 ---
 

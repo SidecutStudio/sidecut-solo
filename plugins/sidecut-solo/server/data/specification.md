@@ -8,7 +8,7 @@ Solo helps agents plan, build, review, and deliver software changes. It selects 
 
 A request for research, planning, diagnosis or review stays inside that scope unless implementation or delivery is also authorized.
 
-Reuse settled decisions and task permission. Use the packaged [owner-input.md](owner-input.md) for material decisions, missing requirements, actionable recommendations and permission. The host controls which question and approval flows a skill can use.
+Reuse settled decisions and task permission. Use the packaged [user-input.md](user-input.md) for material decisions, missing requirements, actionable recommendations and permission. The host controls which question and approval flows a skill can use.
 
 Prepare a concrete reviewable result before asking for delivery permission. Explain the action, effects, cost and recovery where relevant.
 
@@ -34,14 +34,14 @@ Verify claimed provider outcomes before reporting them. Report decisions, skippe
 | solo-plan-change | Produce ordered steps and acceptance checks without implementation. |
 | solo-build-change | Implement scoped working slices, meaningful checks and product-system designs. |
 | solo-diagnose-problem | Reproduce failures and test explanations without fixing them. |
-| solo-check-status | Inspect branches, worktrees, dirty files, PRs, checks and preservation risks without mutation. |
+| solo-list-work | Inspect branches, worktrees, dirty files, PRs, checks and preservation risks without mutation. |
 | solo-review-change | Review the exact subject, substantiate findings and disclose coverage limits. |
 | solo-review-design | Inspect rendered design starting from what is already known about the surface, get a cold second look, and challenge findings before consequential decisions. |
 | solo-verify-change | Exercise actual journeys, boundaries, saved state and recovery. |
 | solo-finish-change | Recover work, verify the latest head, deliver with permission and confirm each requested output. |
 | solo-configure-project | Maintain settings and instruction wiring, installing missing project profiles only on request. |
 | solo-maintain-context | Discover scoped project guidance and scaffold context packs or maintain evidence-backed coding standards and review docs. |
-| solo-improve-workflow | Correct demonstrated recurring working-method failures with a scoped change. |
+| solo-prevent-mistake | Correct demonstrated recurring working-method failures with a scoped change. |
 | solo-compare-plugin | Record requested real use or equivalent comparisons without overstating attribution. |
 | solo-show-usage | Show local usage, cost and recording health in the host's own view, read only. |
 | solo-write-copy | Write or edit words people read from real specifics in the project's voice, scan for AI-writing tells, save the user's picked and rejected lines, and tighten the wording of a repo's agent docs. |

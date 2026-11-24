@@ -85,7 +85,7 @@ describe('retired-names', () => {
     ]);
     expect(at('docs/agent-tooling.md')).toEqual([
       [1, 'dogfood', 'solo-compare-plugin'],
-      [2, 'improve-workflow', 'solo-improve-workflow'],
+      [2, 'improve-workflow', 'solo-prevent-mistake'],
       [3, 'solo-workflow-review-change', 'solo-review-change'],
       [3, 'solo-decide', 'solo-choose-approach'],
     ]);

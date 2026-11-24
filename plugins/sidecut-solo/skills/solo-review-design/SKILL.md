@@ -34,7 +34,7 @@ Critical findings prevent the page's main job or exclude users. Moderate finding
 
 A screenshot cannot prove interaction behavior. With no rendered evidence, say why design was not reviewed instead of critiquing the diff.
 
-Code review remains `solo-review-change`'s job. Name any missing code coverage when reviewing a PR. If requested follow-through depends on a design choice, show the relevant screens before asking. Follow `server/data/owner-input.md` from the loaded plugin root.
+Code review remains `solo-review-change`'s job. Name any missing code coverage when reviewing a PR. If requested follow-through depends on a design choice, show the relevant screens before asking. Follow `server/data/user-input.md` from the loaded plugin root.
 
 When combined with `solo-verify-change`, walk once and write one report. Put functional pass, fail, blocked and not-run results before design findings.
 

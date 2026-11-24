@@ -64,9 +64,9 @@ describe('package', () => {
   }
 });
 
-// Every file that sends the agent to the owner-input guide. Losing one of these pointers, or
+// Every file that sends the agent to the user-input guide. Losing one of these pointers, or
 // pointing one at a path the installed plugin doesn't have, fails here.
-const OWNER_INPUT_POINTERS = [
+const USER_INPUT_POINTERS = [
   'skills/solo/SKILL.md',
   'skills/solo/references/helpers-and-hosts.md',
   'skills/solo-build-change/SKILL.md',
@@ -86,31 +86,31 @@ const OWNER_INPUT_POINTERS = [
   'server/data/specification.md',
 ];
 
-test.each(OWNER_INPUT_POINTERS)('%s points to the packaged owner-input guide', async (file) => {
+test.each(USER_INPUT_POINTERS)('%s points to the packaged user-input guide', async (file) => {
   const text = await readFile(join(PLUGIN, file), 'utf8');
   // Skills name the guide from the plugin root; files beside it in server/data link it directly.
   const pointer = file.startsWith('server/data/')
-    ? '](owner-input.md)'
-    : '`server/data/owner-input.md` from the loaded plugin root';
+    ? '](user-input.md)'
+    : '`server/data/user-input.md` from the loaded plugin root';
   expect(text).toContain(pointer);
 });
 
-test('the packaged owner-input guide keeps both hosts and the permission rule', async () => {
-  const guidance = await readFile(join(PLUGIN, 'server/data/owner-input.md'), 'utf8');
+test('the packaged user-input guide keeps both hosts and the permission rule', async () => {
+  const guidance = await readFile(join(PLUGIN, 'server/data/user-input.md'), 'utf8');
   expect(guidance).toContain('AskUserQuestion');
   expect(guidance).toContain('request_user_input');
   expect(guidance).toContain('cannot satisfy a separate plan approval');
 });
 
-test('every file naming the owner-input guide is in the pointer list', async () => {
+test('every file naming the user-input guide is in the pointer list', async () => {
   const { readdir } = await import('node:fs/promises');
   const files = (await readdir(PLUGIN, { recursive: true })).filter(
-    (f) => f.endsWith('.md') && !f.endsWith('owner-input.md') && !f.endsWith('CHANGELOG.md'),
+    (f) => f.endsWith('.md') && !f.endsWith('user-input.md') && !f.endsWith('CHANGELOG.md'),
   );
   const naming: string[] = [];
   for (const f of files)
-    if ((await readFile(join(PLUGIN, f), 'utf8')).includes('owner-input.md')) naming.push(f);
-  expect(naming.sort()).toEqual([...OWNER_INPUT_POINTERS].sort());
+    if ((await readFile(join(PLUGIN, f), 'utf8')).includes('user-input.md')) naming.push(f);
+  expect(naming.sort()).toEqual([...USER_INPUT_POINTERS].sort());
 });
 
 test('frontmatter that is not valid YAML is rejected', async () => {

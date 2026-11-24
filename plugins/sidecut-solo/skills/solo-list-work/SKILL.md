@@ -1,5 +1,5 @@
 ---
-name: solo-check-status
+name: solo-list-work
 description: "Shows unfinished work and what could be lost. Use when the user asks about branches, project copies, open PRs or cleanup safety. Not for cleanup itself (use solo-finish-change)."
 argument-hint: "[branch, PR or question]"
 allowed-tools:
@@ -9,7 +9,7 @@ allowed-tools:
   - mcp__plugin_sidecut-solo_solo__list_merged_branches
 ---
 
-# Check status
+# List work
 
 Inspect the project's current work without changing it. Explain ownership, unfinished outcomes and cleanup risks in plain words.
 

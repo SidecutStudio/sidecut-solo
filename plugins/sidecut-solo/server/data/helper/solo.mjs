@@ -533,13 +533,13 @@ var SOLO_SKILLS = [
   "solo-plan-change",
   "solo-build-change",
   "solo-diagnose-problem",
-  "solo-check-status",
+  "solo-list-work",
   "solo-review-change",
   "solo-review-design",
   "solo-verify-change",
   "solo-finish-change",
   "solo-configure-project",
-  "solo-improve-workflow",
+  "solo-prevent-mistake",
   "solo-compare-plugin",
   "solo-show-usage",
   "solo-write-copy"
@@ -568,13 +568,16 @@ var SOLO_SKILL_ALIASES = new Map([
   ["solo-plan", "solo-plan-change"],
   ["solo-build", "solo-build-change"],
   ["solo-troubleshoot", "solo-diagnose-problem"],
-  ["solo-status", "solo-check-status"],
+  ["solo-status", "solo-list-work"],
   ["solo-review", "solo-review-change"],
   ["solo-design-review", "solo-review-design"],
   ["solo-verify", "solo-verify-change"],
   ["solo-finish", "solo-finish-change"],
   ["solo-setup", "solo-configure-project"],
-  ["solo-improve-workflow", "solo-improve-workflow"],
+  ["solo-improve-workflow", "solo-prevent-mistake"],
+  ["solo-workflow-improve-workflow", "solo-prevent-mistake"],
+  ["solo-check-status", "solo-list-work"],
+  ["solo-workflow-check-status", "solo-list-work"],
   ["solo-dogfood", "solo-compare-plugin"]
 ]);
 function canonicalSoloSkill(name) {
@@ -3222,7 +3225,7 @@ import { existsSync as existsSync8, readdirSync as readdirSync5, readFileSync as
 import { basename, join as join8 } from "node:path";
 var BARE_SKILLS = {
   dogfood: "solo-compare-plugin",
-  "improve-workflow": "solo-improve-workflow",
+  "improve-workflow": "solo-prevent-mistake",
   "design-review": "solo-review-design",
   troubleshoot: "solo-diagnose-problem",
   investigate: "solo-diagnose-problem",
@@ -3235,7 +3238,7 @@ var BARE_SKILLS = {
   verify: "solo-verify-change",
   finish: "solo-finish-change",
   setup: "solo-configure-project",
-  status: "solo-check-status"
+  status: "solo-list-work"
 };
 var COMMON_WORDS = /* @__PURE__ */ new Set([
   "explore",

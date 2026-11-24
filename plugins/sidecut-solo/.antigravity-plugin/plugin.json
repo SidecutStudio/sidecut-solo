@@ -1,0 +1,21 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "sidecut-solo",
+  "displayName": "Sidecut Solo",
+  "version": "0.38.0",
+  "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+  "logo": "assets/icon.png",
+  "suggestedPrompts": [
+    "Fix the failing checkout calculation and check it works",
+    "Review this change before it goes live",
+    "Finish the change without skipping required checks"
+  ],
+  "author": {
+    "name": "Sidecut Studio",
+    "url": "https://sidecut.dev"
+  },
+  "homepage": "https://sidecut.dev",
+  "repository": "https://github.com/SidecutStudio/sidecut-solo",
+  "license": "MIT",
+  "keywords": ["engineering", "workflow", "review", "verification"]
+}

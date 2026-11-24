@@ -1,10 +1,10 @@
 ---
-name: solo-improve-workflow
+name: solo-prevent-mistake
 description: "Removes the cause of a recurring project mistake. Use when the same wrong command, missed check or instruction conflict keeps happening. Not for a single unexplained failure (use solo-diagnose-problem)."
 argument-hint: "[recurring problem]"
 ---
 
-# Improve workflow
+# Prevent mistake
 
 Fix one repeated problem at its cause and demonstrate the result. Prefer a check or setting that makes the correct action easy.
 
