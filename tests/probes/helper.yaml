@@ -1,0 +1,88 @@
+# Every Solo helper and merge-guard finding from the dogfood records that a free, offline probe can
+# show. Each test runs probe.sh on one build, in a throwaway git repo with a local bare remote and a
+# scripted gh: no model, no network, no real GitHub. metadata.status is fixed (must keep passing) or
+# open (fails until its fix lands); kind is regression or control. The file is a definition for the
+# maintainer's eval runner (`evalbench`), one command variant per build. tests/helpers/probes.test.ts
+# runs every test on this checkout in `npm test`, so CI runs them too. Compare two builds, from this
+# folder, always with --no-cache:
+#   SOLO_BEFORE=<0.37.0's plugins/sidecut-solo> SOLO_AFTER=<0.39.0's plugins/sidecut-solo> \
+#   evalbench run --config helper.yaml --no-cache
+description: Sidecut Solo helper probes
+prompts:
+  - "{{probe}}"
+variants:
+  - label: before
+    type: command
+    command: ./probe.sh
+    env: { SOLO_PLUGIN: "{{env.SOLO_BEFORE}}" }
+    timeout: 60
+  - label: after
+    type: command
+    command: ./probe.sh
+    env: { SOLO_PLUGIN: "{{env.SOLO_AFTER}}" }
+    timeout: 60
+tests:
+  # 12 Nov
+  - description: the merge guard never asks about a plain checked merge in Bypass mode (guard-ask-in-bypass)
+    metadata: { session: 2026-11-12, finding: guard-ask-in-bypass, status: fixed, kind: regression }
+    vars: { probe: "guard::bypassPermissions::gh pr merge 42 --squash --match-head-commit abc123" }
+    assert:
+      - { type: contains, value: "exit=0" }
+      - { type: not-contains, value: "decision=ask" }
+  - description: the merge guard never asks about the helper's own merge in Bypass mode (guard-ask-in-bypass)
+    metadata: { session: 2026-11-12, finding: guard-ask-in-bypass, status: fixed, kind: regression }
+    vars:
+      {
+        probe: "guard::bypassPermissions::sh plugins/sidecut-solo/server/data/helper/solo merge 42 --authorized",
+      }
+    assert:
+      - { type: not-contains, value: "decision=ask" }
+  - description: the merge guard still denies --admin in Bypass mode (control)
+    metadata: { session: 2026-11-12, finding: guard-ask-in-bypass, status: fixed, kind: control }
+    vars: { probe: "guard::bypassPermissions::gh pr merge 42 --squash --admin" }
+    assert:
+      - { type: contains, value: "decision=deny" }
+  - description: a merge from main names the PR branch's worktree and the --repo to rerun with (merge-needs-pr-worktree)
+    metadata:
+      { session: 2026-11-12, finding: merge-needs-pr-worktree, status: fixed, kind: regression }
+    vars: { probe: "merge::other-worktree" }
+    assert:
+      - { type: contains, value: "exit=2" }
+      - { type: contains, value: "it is checked out in" }
+      - { type: contains, value: '--repo "' }
+      - { type: not-contains, value: "review does not cover" }
+      - { type: contains, value: "gh merge call: no" }
+  - description: the same merge from the PR branch's own worktree merges (control)
+    metadata:
+      { session: 2026-11-12, finding: merge-needs-pr-worktree, status: fixed, kind: control }
+    vars: { probe: "merge::pr-worktree" }
+    assert:
+      - { type: contains, value: "exit=0" }
+      - { type: contains, value: '"state": "MERGED"' }
+      - { type: contains, value: "gh merge call: yes" }
+
+  # 14 Nov
+  - description: solo push on a branch that tracks origin/main fails loudly and pushes nothing (solo-push-silent-noop)
+    metadata:
+      { session: 2026-11-14, finding: solo-push-silent-noop, status: fixed, kind: regression }
+    vars: { probe: "push::tracking-base" }
+    assert:
+      - { type: regex, value: "exit=[1-9]" }
+      - { type: contains, value: "base branch" }
+      - { type: not-contains, value: "  feat/x" }
+  - description: solo push on a new branch pushes it and sets the upstream (control)
+    metadata: { session: 2026-11-14, finding: solo-push-silent-noop, status: fixed, kind: control }
+    vars: { probe: "push::new-branch" }
+    assert:
+      - { type: contains, value: "exit=0" }
+      - { type: contains, value: '"status": "pushed"' }
+      - { type: contains, value: "  feat/x" }
+  - description: two --reviewer values are refused or both recorded, never the last one alone (merge-reviewer-single-value)
+    metadata:
+      { session: 2026-11-14, finding: merge-reviewer-single-value, status: open, kind: regression }
+    vars: { probe: "merge::two-reviewers" }
+    assert:
+      - {
+          type: regex,
+          value: "--reviewer given twice|independent[^\\n]*same-agent|same-agent[^\\n]*independent",
+        }
