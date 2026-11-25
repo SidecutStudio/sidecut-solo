@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+  hostCost,
   hostName,
   lastRecorded,
   logOnlyRuns,
@@ -464,4 +465,8 @@ test('SOLO_SKILLS tracks every skill folder and hostName covers all supported ho
   expect(hostName('claude-code')).toBe('Claude Code');
   expect(hostName('codex')).toBe('Codex');
   expect(hostName('antigravity')).toBe('Antigravity');
+  expect(hostCost('claude-code', 0)).toBe('$0.00');
+  expect(hostCost('claude-code', 0.25)).toBe('$0.25');
+  expect(hostCost('codex', 0)).toBe('no cost sent');
+  expect(hostCost('antigravity', 0)).toBe('no cost sent');
 });
