@@ -321,6 +321,7 @@ var HOST_NAMES = {
   antigravity: "Antigravity"
 };
 var hostName = (host) => HOST_NAMES[host] ?? host;
+var hostCost = (host, cost) => host === "claude-code" || cost > 0 ? `$${cost.toFixed(2)}` : "no cost sent";
 var usageFile = () => process.env.CLAUDE_USAGE_FILE ?? join2(homedir(), ".local/state/claude-usage/usage.jsonl");
 var skillLogFile = () => process.env.SIDECUT_SKILL_LOG_FILE ?? join2(homedir(), ".sidecut", "skill-log.jsonl");
 function readSkillRuns(path = skillLogFile()) {
@@ -450,7 +451,7 @@ function report(records, since) {
     "",
     "Hosts (sessions, skill runs, tool calls, tokens, cost)",
     ...sorted(hosts, (row) => row.sessions.size).map(
-      ([host, row]) => `  ${hostName(host)}  ${row.sessions.size} sessions, ${row.skills} skill runs, ${row.tools} tool calls, ${big(row.tokens)} tokens, ${host === "codex" ? "no cost sent" : usd(row.cost)}`
+      ([host, row]) => `  ${hostName(host)}  ${row.sessions.size} sessions, ${row.skills} skill runs, ${row.tools} tool calls, ${big(row.tokens)} tokens, ${hostCost(host, row.cost)}`
     ),
     "",
     "Skills (runs by how they started)",
@@ -874,7 +875,7 @@ function summarize(records, refusals, since, until = /* @__PURE__ */ new Date(),
       hosts: [...hosts].sort((a, b) => b[1].sessions.size - a[1].sessions.size).map(([host, row]) => ({
         name: hostName(host),
         value: row.sessions.size,
-        detail: `${row.skills} skill runs \xB7 ${row.tools} tool calls \xB7 ${whole(row.tokens)} tokens \xB7 ${host === "codex" ? "no cost sent" : `$${row.cost.toFixed(2)}`}`
+        detail: `${row.skills} skill runs \xB7 ${row.tools} tool calls \xB7 ${whole(row.tokens)} tokens \xB7 ${hostCost(host, row.cost)}`
       })),
       tools: [...tools.values()].sort((a, b) => b.value - a.value).map(({ name, value, failed, ms }) => ({
         name,

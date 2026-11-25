@@ -89,6 +89,10 @@ const HOST_NAMES: Record<string, string> = {
 };
 export const hostName = (host: string) => HOST_NAMES[host] ?? host;
 
+/** Formats host cost, reporting `no cost sent` for non-Claude hosts without cost events. */
+export const hostCost = (host: string, cost: number) =>
+  host === 'claude-code' || cost > 0 ? `$${cost.toFixed(2)}` : 'no cost sent';
+
 export const usageFile = () =>
   process.env.CLAUDE_USAGE_FILE ?? join(homedir(), '.local/state/claude-usage/usage.jsonl');
 /** The plugin's own skill hook log: one {time, plugin, skill, host} line per Solo skill run. */
@@ -249,7 +253,7 @@ export function report(records: UsageRecord[], since: Date) {
     'Hosts (sessions, skill runs, tool calls, tokens, cost)',
     ...sorted(hosts, (row) => row.sessions.size).map(
       ([host, row]) =>
-        `  ${hostName(host)}  ${row.sessions.size} sessions, ${row.skills} skill runs, ${row.tools} tool calls, ${big(row.tokens)} tokens, ${host === 'codex' ? 'no cost sent' : usd(row.cost)}`,
+        `  ${hostName(host)}  ${row.sessions.size} sessions, ${row.skills} skill runs, ${row.tools} tool calls, ${big(row.tokens)} tokens, ${hostCost(host, row.cost)}`,
     ),
     '',
     'Skills (runs by how they started)',

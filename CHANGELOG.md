@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.2] - 2026-11-25
+
+### Fixed
+
+- Added Gemini/Antigravity subagent notes to steps 7–8 of `solo-review-change`.
+- Extracted `hostCost` in `server/src/helper/lib/usage.ts` and used it in `server/src/helper/dashboard/summary.ts` so non-Claude hosts without cost events report `no cost sent` instead of `$0.00`.
+
 ## [0.39.1] - 2026-11-25
 
 ### Changed

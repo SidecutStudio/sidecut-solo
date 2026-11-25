@@ -2,6 +2,7 @@
 // self-contained HTML page that draws them. No network, no scripts from elsewhere, nothing written.
 import {
   canonicalSoloSkill,
+  hostCost,
   hostName,
   hostOf,
   isSkillRun,
@@ -283,7 +284,7 @@ export function summarize(
         .map(([host, row]) => ({
           name: hostName(host),
           value: row.sessions.size,
-          detail: `${row.skills} skill runs · ${row.tools} tool calls · ${whole(row.tokens)} tokens · ${host === 'codex' ? 'no cost sent' : `$${row.cost.toFixed(2)}`}`,
+          detail: `${row.skills} skill runs · ${row.tools} tool calls · ${whole(row.tokens)} tokens · ${hostCost(host, row.cost)}`,
         })),
       tools: [...tools.values()]
         .sort((a, b) => b.value - a.value)

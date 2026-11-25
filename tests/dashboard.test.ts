@@ -211,18 +211,28 @@ test('the dashboard adds Codex and hook-log runs per host without counting a run
   expect(both.lists.tokensByModel[0]).toMatchObject({ name: 'gpt-6.1-sol', value: 600 });
   expect(both.lists.hosts.map((r) => r.name).sort()).toEqual(['Claude Code', 'Codex']);
   expect(both.lists.hosts.find((r) => r.name === 'Codex')?.detail).toContain('no cost sent');
-  // Only Claude Code is exported, so the Codex hook-log run counts and the Claude one doesn't.
+  // Only Claude Code is exported, so the Codex and Antigravity hook-log runs count and Claude doesn't.
   const claudeOnly = summarize(
     records,
     [],
     new Date('2026-10-01T00:00:00Z'),
     new Date('2026-11-04T00:00:00Z'),
-    [run('codex', 'solo-verify-change'), run('claude-code', 'solo-build-change')],
+    [
+      run('codex', 'solo-verify-change'),
+      run('antigravity', 'solo-review-change'),
+      run('claude-code', 'solo-build-change'),
+    ],
   );
-  expect(claudeOnly.totals.skills).toBe(2);
+  expect(claudeOnly.totals.skills).toBe(3);
   expect(
     claudeOnly.lists.skills.find((r) => r.name === 'sidecut-solo:solo-verify-change'),
   ).toMatchObject({ value: 1, detail: 'codex skill log 1' });
+  expect(claudeOnly.lists.hosts.find((r) => r.name === 'Antigravity')?.detail).toContain(
+    'no cost sent',
+  );
+  expect(claudeOnly.lists.hosts.find((r) => r.name === 'Antigravity')?.detail).not.toContain(
+    '$0.00',
+  );
   expect(claudeOnly.solo.neverStarted).not.toContain('solo-verify-change');
   expect(dashboardPage(both)).toContain('Codex sends tokens but no cost');
 });
