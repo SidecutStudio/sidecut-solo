@@ -1,7 +1,0 @@
-interface:
-  display_name: "Verify change"
-  short_description: "Exercises real user behavior and reports observed results."
-  icon_small: "../../assets/icon.png"
-  icon_large: "../../assets/icon.png"
-  brand_color: "#FF6B00"
-  default_prompt: "Use $solo-verify-change to exercise real user behavior and reports observed results."

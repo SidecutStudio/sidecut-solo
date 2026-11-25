@@ -539,10 +539,10 @@ var SOLO_SKILLS = [
   "solo-build-change",
   "solo-diagnose-problem",
   "solo-list-work",
-  "solo-review-change",
+  "solo-review-code",
   "solo-review-design",
-  "solo-verify-change",
-  "solo-finish-change",
+  "solo-test-behavior",
+  "solo-deliver-change",
   "solo-configure-project",
   "solo-maintain-context",
   "solo-prevent-mistake",
@@ -564,6 +564,12 @@ function lastRecorded(records, now2) {
   return `Last recorded ${when} UTC, ${days} ${days === 1 ? "day" : "days"} ago: recording may have stopped, so check that the usage receiver is running`;
 }
 var SOLO_SKILL_ALIASES = new Map([
+  ["solo-review-change", "solo-review-code"],
+  ["solo-workflow-review-change", "solo-review-code"],
+  ["solo-verify-change", "solo-test-behavior"],
+  ["solo-workflow-verify-change", "solo-test-behavior"],
+  ["solo-finish-change", "solo-deliver-change"],
+  ["solo-workflow-finish-change", "solo-deliver-change"],
   ["solo-workflow", "solo"],
   ...SOLO_SKILLS.filter((name) => name !== "solo").map((name) => [
     name.replace(/^solo-/, "solo-workflow-"),
@@ -575,10 +581,10 @@ var SOLO_SKILL_ALIASES = new Map([
   ["solo-build", "solo-build-change"],
   ["solo-troubleshoot", "solo-diagnose-problem"],
   ["solo-status", "solo-list-work"],
-  ["solo-review", "solo-review-change"],
+  ["solo-review", "solo-review-code"],
   ["solo-design-review", "solo-review-design"],
-  ["solo-verify", "solo-verify-change"],
-  ["solo-finish", "solo-finish-change"],
+  ["solo-verify", "solo-test-behavior"],
+  ["solo-finish", "solo-deliver-change"],
   ["solo-setup", "solo-configure-project"],
   ["solo-improve-workflow", "solo-prevent-mistake"],
   ["solo-workflow-improve-workflow", "solo-prevent-mistake"],
@@ -3240,9 +3246,9 @@ var BARE_SKILLS = {
   research: "solo-research-topic",
   plan: "solo-plan-change",
   build: "solo-build-change",
-  review: "solo-review-change",
-  verify: "solo-verify-change",
-  finish: "solo-finish-change",
+  review: "solo-review-code",
+  verify: "solo-test-behavior",
+  finish: "solo-deliver-change",
   setup: "solo-configure-project",
   status: "solo-list-work"
 };
@@ -4627,7 +4633,7 @@ if (import.meta.main) {
     console.error(`Blocked: ${message}`);
     if (name === "merge")
       console.error(
-        `Merges follow Finish, which lists every requirement: read ${join12(pluginRoot, "skills", "solo-finish-change", "SKILL.md")}`
+        `Merges follow Deliver Change, which lists every requirement: read ${join12(pluginRoot, "skills", "solo-deliver-change", "SKILL.md")}`
       );
     process.exit(2);
   }

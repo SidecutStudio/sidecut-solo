@@ -56,7 +56,7 @@ test('summarize sums totals, lists and Solo coverage over the window', () => {
   });
   expect(s.lists.refusals[0]).toMatchObject({ name: 'merge: not green', value: 1 });
   expect(s.solo.sessions).toBe(1);
-  expect(s.solo.neverStarted).toContain('solo-verify-change');
+  expect(s.solo.neverStarted).toContain('solo-test-behavior');
   expect(s.solo.neverStarted).not.toContain('solo-build-change');
 });
 
@@ -157,7 +157,7 @@ test('historical and current namespaces share canonical coverage while raw rows 
   expect(s.solo.neverStarted).toHaveLength(15);
   expect(new Set(s.solo.neverStarted).size).toBe(15);
   expect(s.solo.neverStarted).not.toContain('solo-build-change');
-  expect(s.solo.neverStarted).toContain('solo-verify-change');
+  expect(s.solo.neverStarted).toContain('solo-test-behavior');
   expect(s.solo.neverStarted.every((name) => name.startsWith('solo-'))).toBe(true);
   expect(s.lists.skills.map((row) => row.name)).toEqual(
     history.map((row) => row.attrs['skill.name'] as string),
@@ -218,14 +218,14 @@ test('the dashboard adds Codex and hook-log runs per host without counting a run
     new Date('2026-10-01T00:00:00Z'),
     new Date('2026-11-04T00:00:00Z'),
     [
-      run('codex', 'solo-verify-change'),
-      run('antigravity', 'solo-review-change'),
+      run('codex', 'solo-test-behavior'),
+      run('antigravity', 'solo-review-code'),
       run('claude-code', 'solo-build-change'),
     ],
   );
   expect(claudeOnly.totals.skills).toBe(3);
   expect(
-    claudeOnly.lists.skills.find((r) => r.name === 'sidecut-solo:solo-verify-change'),
+    claudeOnly.lists.skills.find((r) => r.name === 'sidecut-solo:solo-test-behavior'),
   ).toMatchObject({ value: 1, detail: 'codex skill log 1' });
   expect(claudeOnly.lists.hosts.find((r) => r.name === 'Antigravity')?.detail).toContain(
     'no cost sent',
@@ -233,6 +233,6 @@ test('the dashboard adds Codex and hook-log runs per host without counting a run
   expect(claudeOnly.lists.hosts.find((r) => r.name === 'Antigravity')?.detail).not.toContain(
     '$0.00',
   );
-  expect(claudeOnly.solo.neverStarted).not.toContain('solo-verify-change');
+  expect(claudeOnly.solo.neverStarted).not.toContain('solo-test-behavior');
   expect(dashboardPage(both)).toContain('Codex sends tokens but no cost');
 });

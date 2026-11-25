@@ -23,11 +23,11 @@ Make the requested change using the project's own patterns and checks.
 6. Run a focused check after each slice. Add tests that protect behavior someone could break. Skip new tests for trivial copy edits or checks that repeat implementation.
 7. Stop adding features when a check fails. Preserve the output, find the cause and rerun after fixing it. Never weaken assertions or skip checks.
 8. Read your diff and simplify it with [simplify.md](references/simplify.md), then run the repository's full required checks on the final result. Missing access or tools remain named blockers. Continue independent work.
-9. Use solo-verify-change for behavior the checks cannot prove. Run solo user-facing to identify design coverage. For visible changes, inspect the rendered result using solo-review-design.
-10. Use solo-review-change at the level `solo user-facing` suggests. Verify review claims before applying fixes.
+9. Use solo-test-behavior for behavior the checks cannot prove. Run solo user-facing to identify design coverage. For visible changes, inspect the rendered result using solo-review-design.
+10. Use solo-review-code at the level `solo user-facing` suggests. Verify review claims before applying fixes.
 11. Review the changed head after fixes. If starting from a design, follow [from-a-design.md](references/from-a-design.md) and report intentional differences.
 12. Commit only this task's changes using repository conventions. Use `solo push` to confirm the remote tip. Open a PR when the repository uses them.
-13. Use solo-configure-project for a new repository's first PR. Use solo-finish-change whenever merging is requested or `merge = "when-green"` permits it.
+13. Use solo-configure-project for a new repository's first PR. Use solo-deliver-change whenever merging is requested or `merge = "when-green"` permits it.
 14. With `merge = "ask"`, ask once when the result is ready unless permission already exists. Keep merge and publication permission separate. In a hands-off task, `server/data/hands-off.md` from the loaded plugin root replaces these questions.
 
 ## Rules

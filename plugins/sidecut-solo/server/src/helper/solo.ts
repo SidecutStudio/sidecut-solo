@@ -646,7 +646,7 @@ if (import.meta.main) {
     console.error(`Blocked: ${message}`);
     if (name === 'merge')
       console.error(
-        `Merges follow Finish, which lists every requirement: read ${join(pluginRoot, 'skills', 'solo-finish-change', 'SKILL.md')}`,
+        `Merges follow Deliver Change, which lists every requirement: read ${join(pluginRoot, 'skills', 'solo-deliver-change', 'SKILL.md')}`,
       );
     process.exit(2);
   }

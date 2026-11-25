@@ -1,6 +1,6 @@
 ---
 name: solo-list-work
-description: "Shows unfinished work and what could be lost. Use when the user asks about branches, project copies, open PRs or cleanup safety. Not for cleanup itself (use solo-finish-change)."
+description: "Shows unfinished work and what could be lost. Use when the user asks about branches, project copies, open PRs or cleanup safety. Not for cleanup itself (use solo-deliver-change)."
 argument-hint: "[branch, PR or question]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" inventory *)
@@ -21,7 +21,7 @@ Inspect the project's current work without changing it. Explain ownership, unfin
 4. Classify work as the user's, this task's, the only known copy or unknown. Treat unknown ownership as the user's.
 5. Check handoff notes and dated plans against the code and Git history. Identify stale claims without deleting the notes.
 6. Call something safe to remove only with proof its contents survive elsewhere. A merged ancestor does not prove later commits preserved its behavior.
-7. Recommend the next action. Route authorized cleanup or completion to `solo-finish-change`.
+7. Recommend the next action. Route authorized cleanup or completion to `solo-deliver-change`.
 
 ## Rules
 

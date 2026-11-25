@@ -1,6 +1,6 @@
 ---
 name: solo-review-design
-description: "Reviews rendered screens for concrete design improvements. Use when the user asks about layout, clarity or accessibility of a screen. Not for functional journey verification (use solo-verify-change) or rewriting its words (use solo-write-copy)."
+description: "Reviews rendered screens for concrete design improvements. Use when the user asks about layout, clarity or accessibility of a screen. Not for functional journey verification (use solo-test-behavior) or rewriting its words (use solo-write-copy)."
 argument-hint: "[URL, PR, branch or mockup]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" user-facing *)
@@ -16,7 +16,7 @@ Review what people actually see and explain the most useful improvements. Report
 1. Identify the URL, commit, account and fixture data. Prefer a rendered preview or running page over screenshots and inspect the product's design guidance.
 2. Gather what is already known about the surface: earlier review findings, open issues, roadmap or plan items and user reports, including notes kept outside the repository. Each one is re-checked and reported as fixed, still open or not reached, never dropped.
 3. For a PR, use `get_user_facing_changes` or the helper's `solo user-facing` command to locate affected surfaces. Review them at the requested head.
-4. Inspect phone, tablet and desktop widths, supported themes and reachable empty, loading and error states. Check scrolling, hover, focus and touch behavior. Open a card, accordion or menu beside closed neighbors and look at the space around it, not only inside it.
+4. Use `server/data/screen-walkthrough.md` for browser setup, viewport and captures. Inspect relevant themes and states. Open a disclosure beside closed neighbors to see how the full layout responds.
 5. Keep production read-only. Open safe navigation and disclosure controls, but do not send, save, publish, pay, invite, delete or change settings.
 6. Consider first impression, the main job, hierarchy, consistency, words and accessibility. Look beyond the main content to navigation, headers and small print.
 7. Collect broad candidate findings before selecting them. Do not invent a quota when the surface is small.
@@ -34,9 +34,9 @@ Critical findings prevent the page's main job or exclude users. Moderate finding
 
 A screenshot cannot prove interaction behavior. With no rendered evidence, say why design was not reviewed instead of critiquing the diff.
 
-Code review remains `solo-review-change`'s job. Name any missing code coverage when reviewing a PR. If requested follow-through depends on a design choice, show the relevant screens before asking. Follow `server/data/user-input.md` from the loaded plugin root.
+Code review remains `solo-review-code`'s job. Name any missing code coverage when reviewing a PR. If requested follow-through depends on a design choice, show the relevant screens before asking. Follow `server/data/user-input.md` from the loaded plugin root.
 
-When combined with `solo-verify-change`, walk once and write one report. Put functional pass, fail, blocked and not-run results before design findings.
+When testing the same flow, follow the shared walkthrough and report from `server/data/screen-walkthrough.md`.
 
 ## Done when
 
@@ -46,4 +46,6 @@ The report gives first impression, checked findings, strengths and priority fixe
 
 | Read | When |
 | --- | --- |
-| [report.md](references/report.md) | Writing findings and the implementation handoff |
+| [screen-criteria.md](references/screen-criteria.md) | Review the rendered layout, contrast and controls. |
+| [report.md](references/report.md) | Write findings and the implementation handoff. |
+| [mobile-layout.md](examples/mobile-layout.md) | Describe a phone layout finding using a rendered observation. |

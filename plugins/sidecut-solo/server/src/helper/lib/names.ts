@@ -20,9 +20,9 @@ const BARE_SKILLS: Record<string, string> = {
   research: 'solo-research-topic',
   plan: 'solo-plan-change',
   build: 'solo-build-change',
-  review: 'solo-review-change',
-  verify: 'solo-verify-change',
-  finish: 'solo-finish-change',
+  review: 'solo-review-code',
+  verify: 'solo-test-behavior',
+  finish: 'solo-deliver-change',
   setup: 'solo-configure-project',
   status: 'solo-list-work',
 };

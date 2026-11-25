@@ -49,7 +49,8 @@ describe('retired-names', () => {
       'docs/agent-tooling.md',
       'Use `dogfood` only when asked.\n' +
         'A problem only this repo has goes through `improve-workflow`.\n' +
-        'Run the `solo-workflow-review-change` skill, then `solo-decide`.\n',
+        'Run the `solo-workflow-review-change` skill, then `solo-decide`.\n' +
+        'Use `solo-verify-change`, `solo-review-change` and `solo-finish-change`.\n',
     );
     write(
       repo,
@@ -86,8 +87,11 @@ describe('retired-names', () => {
     expect(at('docs/agent-tooling.md')).toEqual([
       [1, 'dogfood', 'solo-compare-plugin'],
       [2, 'improve-workflow', 'solo-prevent-mistake'],
-      [3, 'solo-workflow-review-change', 'solo-review-change'],
+      [3, 'solo-workflow-review-change', 'solo-review-code'],
       [3, 'solo-decide', 'solo-choose-approach'],
+      [4, 'solo-review-change', 'solo-review-code'],
+      [4, 'solo-verify-change', 'solo-test-behavior'],
+      [4, 'solo-finish-change', 'solo-deliver-change'],
     ]);
   });
 
@@ -102,7 +106,7 @@ describe('retired-names', () => {
         '',
         'Follow `solo-workflow.toml`. Use the relevant Solo skill, or `solo` to route the request.',
         'Keep overrides in `solo-workflow.local.toml`; task records live in `.git/solo-workflow/`.',
-        'Use `solo-review-change`, with the `solo-reviewer` profile, then run `build` and `review`.',
+        'Use `solo-review-code`, with the `solo-reviewer` profile, then run `build` and `review`.',
         'The task queue picks up the `solo-ready` label; each skill writes `solo-workflow-owner`.',
         'Records live in $(git rev-parse --git-common-dir)/solo-workflow/ and $XDG_STATE_HOME/solo-workflow/.',
         'Task records live under solo-workflow/TASK in .git/solo-workflow/ and ~/.local/state/solo-workflow/.',

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.40.0] - 2026-11-25
+
+### Changed
+
+- Renamed Verify Change to Test Behavior, Review Change to Review Code, and Finish Change to Deliver Change. Usage summaries and `solo retired-names` recognize the previous names.
+- Gave functional QA, rendered design review and plugin dogfooding clearer entry points. A shared walkthrough covers screen setup and reporting, with examples for persistence, mobile layout and combined reviews.
+
 ## [0.39.2] - 2026-11-25
 
 ### Fixed

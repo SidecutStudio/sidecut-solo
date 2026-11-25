@@ -6,7 +6,7 @@ export const meta = {
   phases: [{ title: 'Review' }, { title: 'Refute' }],
 }
 
-// Started by the review skill (see skills/solo-review-change/references/deep-review.md) with args
+// Started by the review skill (see skills/solo-review-code/references/deep-review.md) with args
 // { repo, base, head, files: [...], requirements, high_risk?, behavior_docs?, max_agents?,
 // first_pass_model? }. The skill
 // lists the changed files itself (git diff --name-only base...head), so no agent is spent on that.

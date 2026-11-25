@@ -35,10 +35,10 @@ Verify claimed provider outcomes before reporting them. Report decisions, skippe
 | solo-build-change | Implement scoped working slices, meaningful checks and product-system designs. |
 | solo-diagnose-problem | Reproduce failures and test explanations without fixing them. |
 | solo-list-work | Inspect branches, worktrees, dirty files, PRs, checks and preservation risks without mutation. |
-| solo-review-change | Review the exact subject, substantiate findings and disclose coverage limits. |
+| solo-review-code | Review the exact subject, substantiate findings and disclose coverage limits. |
 | solo-review-design | Inspect rendered design starting from what is already known about the surface, get a cold second look, and challenge findings before consequential decisions. |
-| solo-verify-change | Exercise actual journeys, boundaries, saved state and recovery. |
-| solo-finish-change | Recover work, verify the latest head, deliver with permission and confirm each requested output. |
+| solo-test-behavior | Exercise actual journeys, boundaries, saved state and recovery. |
+| solo-deliver-change | Recover work, verify the latest head, deliver with permission and confirm each requested output. |
 | solo-configure-project | Maintain settings and instruction wiring, installing missing project profiles only on request. |
 | solo-maintain-context | Discover scoped project guidance and scaffold context packs or maintain evidence-backed coding standards and review docs. |
 | solo-prevent-mistake | Correct demonstrated recurring working-method failures with a scoped change. |
@@ -180,7 +180,7 @@ Open Critical design findings block delivery alongside blocker and major code fi
 
 Deep review is opt-in. Review areas and interactions, refute findings, respect host and spending limits and report missing coverage and available cost evidence.
 
-Verification exercises actual user interfaces, failure paths, persistence after refresh and relevant recovery. Check widths, themes, overflow, contrast and touch behavior for pages.
+Behavior testing exercises actual user interfaces, failure paths, persistence after refresh and recovery. Check whether users can complete affected flows at relevant widths and with supported input methods. Design review checks rendered layout, clarity and accessibility, including contrast and touch targets.
 
 Mocks, unit tests, CI, live journeys and fresh-host discovery prove different things. Label simulated and unperformed checks clearly.
 

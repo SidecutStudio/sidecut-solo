@@ -23,17 +23,17 @@ The `solo` skill routes each request to the right step, or you can name one:
 | `solo-choose-approach` | Compares workable approaches for a grounded recommendation. |
 | `solo-compare-plugin` | Compares plugin sessions and controlled runs from recorded evidence. |
 | `solo-configure-project` | Maintains Solo settings and repository instruction wiring. |
+| `solo-deliver-change` | Delivers authorized work through project checks, merge and cleanup. |
 | `solo-diagnose-problem` | Investigates a failure or performance problem using evidence. |
-| `solo-finish-change` | Completes checks, delivery and cleanup under repository rules. |
 | `solo-list-work` | Shows unfinished work and what could be lost. |
 | `solo-maintain-context` | Maintains repo-owned context packs and evidence-backed coding standards and review guidance. |
 | `solo-plan-change` | Turns a settled change into ordered steps with checks. |
 | `solo-prevent-mistake` | Removes the cause of a recurring project mistake. |
 | `solo-research-topic` | Finds outside facts with current sources. |
-| `solo-review-change` | Reviews a change for demonstrated defects and delivery risks. |
+| `solo-review-code` | Reviews code for defects and delivery risks. |
 | `solo-review-design` | Reviews rendered screens for concrete design improvements. |
 | `solo-show-usage` | Shows which skills, tools and agents ran, what they cost and whether usage is still being recorded. |
-| `solo-verify-change` | Exercises real user behavior and reports observed results. |
+| `solo-test-behavior` | Tests what a product does through its real interface. |
 | `solo-write-copy` | Writes words people read so they're specific, sound like their author and carry no AI-writing tells. |
 
 ## Install
