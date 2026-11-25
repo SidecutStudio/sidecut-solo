@@ -49,7 +49,7 @@ dogfood/            scrubbed example records; the full history is in the private
 - Keep skill procedures in their owning folders. Name other skills instead of linking across their supporting files.
 - Change specialist instructions in `plugins/sidecut-solo/agents/`, then regenerate packaged and project Codex profiles. Never hand-edit protected generated TOML.
 - Rebuild bundles, notices, dashboard output and profiles after changing their sources. Commit generated output with its source change.
-- Add release notes to the root CHANGELOG and run `npm exec --no -- sidecut-version <version>` to generate the package and host versions. Keep the copied README and LICENSE aligned for installed-content changes.
+- Follow [RELEASING.md](RELEASING.md) for versioning, artifacts and the marketplace handoff. Keep the copied README and LICENSE aligned for installed-content changes.
 - Preserve all required checks in `solo-workflow.toml`. Every check must pass on the exact reviewed current PR head before merging.
 - Use solo-deliver-change for delivery. Missing, skipped, cancelled, queued or failed checks never count as success.
 - Preserve unrelated work, unique commits and files. Remove only task-created resources whose content is proven preserved.
