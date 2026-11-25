@@ -33,9 +33,9 @@ Keep project settings accurate without turning routine maintenance into first-ti
 14. Commit settings, instruction edits and applicable ignore rules together unless the user excludes commits.
 15. In a new repository, include settings in its first PR. Default merge to ask unless already authorized. Record required checks after observing actual PR names.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+## Rules
 
-Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
+Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.md` from the loaded plugin root.
 
 Write only repository facts and settled user policy. Do not install dependencies, edit CI or change product code through configuration.
 

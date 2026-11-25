@@ -30,9 +30,9 @@ Make the requested change using the project's own patterns and checks.
 13. Use solo-configure-project for a new repository's first PR. Use solo-finish-change whenever merging is requested or `merge = "when-green"` permits it.
 14. With `merge = "ask"`, ask once when the result is ready unless permission already exists. Keep merge and publication permission separate. In a hands-off task, `server/data/hands-off.md` from the loaded plugin root replaces these questions.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+## Rules
 
-Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
+Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.md` from the loaded plugin root.
 
 Change protected generated files through their source and documented generator. Include generated output with the source change.
 

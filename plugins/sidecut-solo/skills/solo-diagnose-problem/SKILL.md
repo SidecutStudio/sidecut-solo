@@ -19,7 +19,9 @@ Explain the demonstrated cause or narrow the uncertainty without changing the us
 7. After two failed explanations sharing an assumption, write that assumption down and test it before another attempt.
 8. Follow [debugging.md](references/debugging.md) for temporary instrumentation, isolated reproduction, version tracing and repeated failures.
 9. Recheck the conclusion against all observations. Keep confirmed facts, inference and unknowns distinct.
-10. Use the investigator agent (`solo_investigator` in Codex) for broad logs or CI history unless the user forbids delegation. Give it a bounded question and read-only scope.
+10. Use the investigator agent (`solo_investigator` in Codex, `investigator` via `invoke_subagent` in Gemini/Antigravity) for broad logs or CI history unless the user forbids delegation. Give it a bounded question and read-only scope.
+
+## Rules
 
 Run existing tests, linters and builds when they write only ignored build output.
 

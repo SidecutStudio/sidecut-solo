@@ -19,7 +19,7 @@ Write words a stranger reads to the end: built from the subject's real specifics
 7. Deliver the whole result where it'll live: a rendered page, a rendered README, the post in its real format. New page copy is never shown as text alone in chat. Say in a line what you cut or restructured, then take the user's notes in one round. When `solo-choose-approach` sent you here, return the words to it instead of showing a page.
 8. Save the user's verdict: when they pick, reject or rewrite a line, add it to the project's voice guide with a few words on why. With no voice guide, offer to start one.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+Resolve the plugin root across hosts via `server/data/helper-launcher.md` from the loaded plugin root.
 
 ## Agent docs
 

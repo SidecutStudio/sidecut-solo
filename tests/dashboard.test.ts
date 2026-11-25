@@ -154,8 +154,8 @@ test('historical and current namespaces share canonical coverage while raw rows 
   );
   expect(s.solo.sessions).toBe(3);
   expect(s.solo.routerOnly).toBe(2);
-  expect(s.solo.neverStarted).toHaveLength(14);
-  expect(new Set(s.solo.neverStarted).size).toBe(14);
+  expect(s.solo.neverStarted).toHaveLength(15);
+  expect(new Set(s.solo.neverStarted).size).toBe(15);
   expect(s.solo.neverStarted).not.toContain('solo-build-change');
   expect(s.solo.neverStarted).toContain('solo-verify-change');
   expect(s.solo.neverStarted.every((name) => name.startsWith('solo-'))).toBe(true);

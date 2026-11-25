@@ -41,9 +41,9 @@ Bring the requested work to a verified end state while preserving everything the
 15. Confirm the provider reports merged and verify the merged head. Check every requested tag, release, asset, package, deployment and installed update separately.
 16. Clean only task-owned resources using [cleanup.md](references/cleanup.md), including the session's own host worktree once the merge is proven. Preserve every unique commit and file. Never force cleanup or delete another task's work.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+## Rules
 
-Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
+Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.md` from the loaded plugin root.
 
 Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. In a hands-off task under `merge = "ask"`, the merge answer recorded at its start (`server/data/hands-off.md`) is the merge permission. Follow `server/data/user-input.md` from the loaded plugin root.
 

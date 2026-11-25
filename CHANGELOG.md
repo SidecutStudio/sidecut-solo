@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.39.1] - 2026-11-25
+
+### Changed
+
+- Synced `sidecut-agentskills` to `v2.6.2` (`VOICE.md` and `package.json`).
+- Aligned `README.md` with the Install source layout and added `agy plugin install ./plugins/sidecut-solo` for Antigravity.
+- Added Antigravity parity in `server/data/visual-reports.md`, `server/data/user-input.md`, `server/data/helper-launcher.md`, `solo-diagnose-problem`, `solo-verify-change`, `solo-show-usage`, `solo-review-change/references/deep-review.md`, and `server/src/helper/lib/usage.ts` (`antigravity` host display name and `solo-maintain-context` in `SOLO_SKILLS`).
+- Added an explicit `tools` allowlist to `agents/verifier.md`, standardized `## Rules` across specialist skills, moved repeated launcher text into `server/data/helper-launcher.md`, and integrated `visual-reports.md` steps in `solo-review-change` and `solo-compare-plugin`.
+- Set `SIDECUT_SKILL_LOG=0` in `tests/setup.ts` and added tests enforcing `SOLO_SKILLS`, `antigravity` host naming, and explicit agent `tools` allowlists.
+
 ## [0.39.0] - 2026-11-24
 
 ### Added

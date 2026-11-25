@@ -17,6 +17,8 @@ Work in the named repository and its active checkout. Read repository instructio
 3. Show the intended files, changed rules or pointers, and the evidence. For a preview or draft-only request, report and finish. When the request authorizes creation or refresh, apply the scoped changes. Ask only about missing scope decisions that affect the result. Follow `server/data/user-input.md` from the loaded plugin root.
 4. Re-read the changed files and check the diff. Resolve every new pointer and confirm a matching task finds the pack or rule and an unrelated task skips it. Report changed files, sources, incomplete history and no-change outcomes. Use Solo's delivery workflow if the user also requests delivery.
 
+## Rules
+
 Other skills read packs and standards through `server/data/project-guidance.md` from the loaded plugin root. Keep what this skill writes findable by that procedure.
 
 ## Done when

@@ -42,6 +42,8 @@ If profiles are unavailable, pass the bundled role instructions to native worker
 
 Pass `model` and `reasoning_effort` on `spawn_agent` for each worker: a listed cheaper model such as `codex_review_model` for ordinary areas when the allowance permits it, and the parent's model and effort for high-risk areas, interactions and serious refuters.
 
+In Gemini/Antigravity, launch `invoke_subagent` with `TypeName` set to `reviewer` for each area and interactions, and `refuter` for findings (`Model: "flash"` for ordinary areas when the allowance permits it, and `"inherit"` for high-risk areas, interactions and serious refuters).
+
 Without subagents, report deep review unavailable and perform a normal review.
 
 Deep review covers code. Use solo-review-design when design_review_needed is true or the change affects visible design.
