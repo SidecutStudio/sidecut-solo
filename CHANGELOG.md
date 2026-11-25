@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.40.1] - 2026-11-25
+
+### Fixed
+
+- Clarified in `server/data/user-input.md` and `solo-choose-approach` that Gemini/Antigravity runs `ask_question` before rendering the turn's message, so new options, comparisons, drafts, reports, and end-of-turn follow-ups must be shown in a completed chat turn before invoking `ask_question`.
+
 ## [0.40.0] - 2026-11-25
 
 ### Changed
