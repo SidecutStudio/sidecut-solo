@@ -60,7 +60,7 @@ Explicit scaffold and refresh requests use `solo-maintain-context`. Preview and 
 
 The package lives under plugins/sidecut-solo in its source repository. Its install ID is sidecut-solo; the product remains Sidecut Solo.
 
-Both host manifests agree on identity, version and shared metadata. Codex uses .codex-plugin/plugin.json and Claude Code uses .claude-plugin/plugin.json.
+Host manifests agree on identity, version and shared metadata: Claude Code uses `.claude-plugin/plugin.json`, Codex uses `.codex-plugin/plugin.json` and Gemini/Antigravity uses `.antigravity-plugin/plugin.json`.
 
 Keep the package without a root Agent Plugins manifest because its hooks use the host-specific manifest discovery paths.
 
@@ -95,7 +95,7 @@ The usage tool provides an MCP App dashboard where supported. Terminal clients r
 
 ## Hooks and roles
 
-Separate Claude Code and Codex hook files register the same installed scripts with each host's event names. Codex requires user trust before running hooks.
+Separate Claude Code and Codex hook files register the same installed scripts with each host's event names, and root `hooks.json` registers the skill-log hook for Gemini/Antigravity. Codex requires user trust before running hooks.
 
 The merge guard rejects admin merges that would skip required checks in configured repositories. It reads command data rather than descriptions and does not enforce a sandbox boundary.
 

@@ -315,7 +315,11 @@ function logOnlyRuns(records, runs, since) {
   );
   return runs.filter((r) => new Date(r.time) >= since && !exported.has(r.host));
 }
-var HOST_NAMES = { "claude-code": "Claude Code", codex: "Codex" };
+var HOST_NAMES = {
+  "claude-code": "Claude Code",
+  codex: "Codex",
+  antigravity: "Antigravity"
+};
 var hostName = (host) => HOST_NAMES[host] ?? host;
 var usageFile = () => process.env.CLAUDE_USAGE_FILE ?? join2(homedir(), ".local/state/claude-usage/usage.jsonl");
 var skillLogFile = () => process.env.SIDECUT_SKILL_LOG_FILE ?? join2(homedir(), ".sidecut", "skill-log.jsonl");
@@ -539,6 +543,7 @@ var SOLO_SKILLS = [
   "solo-verify-change",
   "solo-finish-change",
   "solo-configure-project",
+  "solo-maintain-context",
   "solo-prevent-mistake",
   "solo-compare-plugin",
   "solo-show-usage",

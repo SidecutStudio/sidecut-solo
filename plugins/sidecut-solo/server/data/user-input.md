@@ -8,7 +8,8 @@ Ask in the main session. Batch related questions that are ready together. For a 
 
 - In Claude Code, use `AskUserQuestion` when the active session exposes it. Use its custom-answer affordance. Plain headless runs may omit it. Use `ExitPlanMode` for native plan approval when Claude Code requires it.
 - In Codex, use `request_user_input` for decisions when the active mode exposes and permits it. Plan mode supports planning questions. In Default mode, use this tool only for optional questions that materially improve the work, when exposed. Use a concise chat question for required input or task authorization in Default mode unless the surface offers another native question tool explicitly permitted for that purpose.
-- If the host exposes an asynchronous question tool, use it only where its instructions permit the question. Continue unrelated work while it is pending. If no eligible tool is available, ask in concise chat and invite the user's own answer.
+- In Gemini/Antigravity, use `ask_question` for multi-choice decisions when exposed, and concise chat questions for yes/no confirmations or task authorization.
+- If another host exposes an asynchronous question tool, use it only where its instructions permit the question. Continue unrelated work while it is pending. If no eligible tool is available, ask in concise chat and invite the user's own answer.
 - Use the host's native confirmation or permission flow whenever it applies. A question answer can record a task choice or explicit task consent where the host permits it. It cannot satisfy a separate plan approval, sandbox escalation, connector confirmation or other execution gate. Stay in the active host mode and preserve refusals.
 
 ## Offer follow-ups

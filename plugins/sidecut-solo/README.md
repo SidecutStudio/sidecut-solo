@@ -2,11 +2,11 @@
 
 Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.
 
-Say "fix signup and get it merged" and it finds the cause, makes the fix, gets it reviewed and merges it once the checks pass, stopping only when a decision is yours. It works the same way in Claude Code and Codex, with Gemini/Antigravity guidance in the skill references.
-
 ## What it does
 
-The hard part isn't writing the code. It's everything an agent tends to fudge after that: calling a queued check a pass, merging a commit nobody reviewed, losing uncommitted work while cleaning up, or saying "shipped" when only the merge happened. Solo moves those steps out of the agent's judgment and into a helper that checks them:
+Say "fix signup and get it merged" and it finds the cause, makes the fix, gets it reviewed and merges it once the checks pass, stopping only when a decision is yours. It works across Claude Code, Codex and Gemini/Antigravity.
+
+The hard part isn't writing the code. It's everything an agent tends to skip after that: calling a queued check a pass, merging a commit nobody reviewed, losing uncommitted work while cleaning up, or saying "shipped" when only the merge happened. Solo moves those steps out of the agent's judgment and into a helper that checks them:
 
 - **Merges only what was reviewed.** The helper merges a pull request at the exact commit that was reviewed, and only once every required check passed on that commit. A missing, skipped, queued or cancelled check is never a pass.
 - **A second pair of eyes, sized to the risk.** A typo gets a careful pass from the agent itself. An ordinary fix goes to an independent reviewer agent that reads the exact diff cold, and the agent then checks the reviewer's claims against the code. Sign-in, payments, CI or hooks get a deep review, and a refuter agent challenges any surprising serious finding before you see it.
@@ -40,21 +40,24 @@ The `solo` skill routes each request to the right step, or you can name one:
 
 You need Git, Node.js 24 or newer, and, to deliver through GitHub, the GitHub CLI (`gh`) signed in.
 
-In Claude Code:
+In Claude Code, add this repo's marketplace, then install the plugin:
 
 ```text
 /plugin marketplace add SidecutStudio/sidecut-solo
 /plugin install sidecut-solo@sidecut-solo
 ```
 
-In Codex:
+In Codex, run:
 
 ```bash
 codex plugin marketplace add SidecutStudio/sidecut-solo
+codex plugin add sidecut-solo@sidecut-solo
 ```
 
+In Antigravity, from a clone of this repo:
+
 ```bash
-codex plugin add sidecut-solo@sidecut-solo
+agy plugin install ./plugins/sidecut-solo
 ```
 
 Install it at user level rather than in a repository's own settings, so every worktree uses the same current copy.

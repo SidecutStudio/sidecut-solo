@@ -1,6 +1,7 @@
 ---
 name: verifier
 description: "Exercises one allowed product journey and reports observations. Use when a real browser, app, CLI or API scenario needs checking. Not for code review or fixes."
+tools: [Read, Grep, Glob, Bash, WebFetch, WebSearch]
 disallowedTools: [Edit, Write, NotebookEdit]
 model: inherit
 ---

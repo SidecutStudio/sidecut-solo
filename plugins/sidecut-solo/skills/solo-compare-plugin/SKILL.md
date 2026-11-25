@@ -25,8 +25,7 @@ Record what a plugin actually contributed and limit conclusions to observed evid
 10. For version comparisons, run each populated plugin version separately with matching scenario, host, model and starting tree. Label both versions accurately.
 11. Record version runs as `kind: "regression"` without a comparison block. Validate each through `qa-check` and compare their checks in an external paired report.
 12. Preserve authorized logging and redact secrets from saved evidence. Keep run logs, exact versions, command results, failures and cost or session counts.
-
-Use `server/data/visual-reports.md` from the loaded plugin root when a paired report benefits from visible comparisons. Keep saved-record validation and attribution limits intact.
+13. Use `server/data/visual-reports.md` from the loaded plugin root when a paired report benefits from visible comparisons, keeping saved-record validation and attribution limits intact.
 
 ## Rules
 

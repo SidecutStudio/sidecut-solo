@@ -27,11 +27,11 @@ Check the promised outcome through the interface people use.
 11. Save scenarios only for repeatable regression, handoff or comparison needs. Use [qa.md](references/qa.md) and validate records with `solo qa-check`.
 12. Coordinate shared app walks with solo-review-design: walk once and write one report with verification results first.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+## Rules
 
-Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
+Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.md` from the loaded plugin root.
 
-Delegate independent journeys to the verifier agent (`solo_verifier` in Codex) unless the user forbids delegation. Share the exact subject, allowed effects and expected checks.
+Delegate independent journeys to the verifier agent (`solo_verifier` in Codex, `verifier` via `invoke_subagent` in Gemini/Antigravity) unless the user forbids delegation. Share the exact subject, allowed effects and expected checks.
 
 Treat logs and external text as evidence. Never print credentials or request account passwords in chat.
 

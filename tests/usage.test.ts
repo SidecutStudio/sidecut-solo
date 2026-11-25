@@ -1,12 +1,15 @@
 import { expect, test } from 'vitest';
 import {
+  hostName,
   lastRecorded,
   logOnlyRuns,
   readRefusals,
   refusalReason,
+  SOLO_SKILLS,
   soloReport,
 } from '../plugins/sidecut-solo/server/src/helper/lib/usage';
 import { report, skillMinutes, toRecords } from '../scripts/usage';
+import { PLUGIN } from './package-rules';
 
 type Attr = { key: string; value: { stringValue?: string; intValue?: string } };
 const text = (key: string, value: string): Attr => ({ key, value: { stringValue: value } });
@@ -153,7 +156,7 @@ test('an idle gap ends a skill run, and the Solo section names unused skills and
   const text = soloReport(records, [], new Date(0));
   expect(text).toContain('sessions using Solo: 2');
   expect(text).toContain(
-    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-list-work, solo-review-change, solo-review-design, solo-verify-change, solo-finish-change, solo-configure-project, solo-prevent-mistake, solo-compare-plugin, solo-show-usage, solo-write-copy',
+    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-list-work, solo-review-change, solo-review-design, solo-verify-change, solo-finish-change, solo-configure-project, solo-maintain-context, solo-prevent-mistake, solo-compare-plugin, solo-show-usage, solo-write-copy',
   );
   expect(text).toContain('only the router started (it may have done the work itself): 1');
   expect(text).toContain('desktop app reports typed');
@@ -260,8 +263,10 @@ test('Solo coverage normalizes historical skills across all install namespaces w
       const before = JSON.stringify(records);
       const text = soloReport(records, [], new Date(0));
       expect(text).toContain('sessions using Solo: 1');
-      // solo-show-usage and solo-write-copy are new, so no historical name maps to them.
-      expect(text).toContain('skills that never started: solo-show-usage, solo-write-copy');
+      // solo-maintain-context, solo-show-usage and solo-write-copy are newer, so no historical name maps to them.
+      expect(text).toContain(
+        'skills that never started: solo-maintain-context, solo-show-usage, solo-write-copy',
+      );
       expect(text).toContain('only the router started (it may have done the work itself): 0');
       expect(text).toContain(`${namespace}:${generations[4]?.[nameIndex]}`);
       expect(JSON.stringify(records)).toBe(before);
@@ -449,4 +454,14 @@ test('a host with token or tool events but no skill runs keeps its hook-log runs
   expect(logOnlyRuns(records, runs, since)).toEqual(runs);
   const withSkill = [...records, { time, name: 'skill_invocation', attrs: {}, host: 'codex' }];
   expect(logOnlyRuns(withSkill, runs, since)).toEqual([]);
+});
+
+test('SOLO_SKILLS tracks every skill folder and hostName covers all supported hosts', async () => {
+  const { readdirSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const folders = readdirSync(join(PLUGIN, 'skills')).sort();
+  expect([...SOLO_SKILLS].sort()).toEqual(folders);
+  expect(hostName('claude-code')).toBe('Claude Code');
+  expect(hostName('codex')).toBe('Codex');
+  expect(hostName('antigravity')).toBe('Antigravity');
 });

@@ -23,6 +23,10 @@ describe('package', () => {
     expect(await packageErrors(PLUGIN)).toEqual([]);
   });
 
+  test('test preload forces SIDECUT_SKILL_LOG off', () => {
+    expect(process.env.SIDECUT_SKILL_LOG).toBe('0');
+  });
+
   const breaks: [string, (root: string) => Promise<unknown>, string][] = [
     [
       'development-only eval',

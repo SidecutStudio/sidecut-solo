@@ -27,10 +27,11 @@ Find defects supported by evidence and report the limits of the review.
 10. Re-review after fixes using [re-review.md](references/re-review.md) and the after-fixes rules in [review-levels.md](references/review-levels.md). Never carry review approval forward to a different head.
 11. Use the multi-agent review in [deep-review.md](references/deep-review.md) only when the user asks for a thorough or multi-agent review. The deep level alone is one reviewer.
 12. For a merge, provide the exact-head review record described in [review-record.md](references/review-record.md). Let solo-finish-change own delivery.
+13. When presenting a review with five or more findings, use `server/data/visual-reports.md` from the loaded plugin root to choose between chat and an HTML report.
 
-Resolve the plugin root from this loaded skill in Codex. In Claude Code, use `${CLAUDE_PLUGIN_ROOT}`.
+## Rules
 
-Run `sh "PLUGIN_ROOT/server/data/helper/solo" COMMAND --repo REPO`. Below, `solo COMMAND` means that launcher.
+Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.md` from the loaded plugin root.
 
 Report without editing, fetching or changing Git state. Keep secrets out of evidence.
 

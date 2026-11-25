@@ -82,7 +82,11 @@ export function logOnlyRuns(records: UsageRecord[], runs: SkillRun[], since: Dat
   return runs.filter((r) => new Date(r.time) >= since && !exported.has(r.host));
 }
 
-const HOST_NAMES: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex' };
+const HOST_NAMES: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
+  antigravity: 'Antigravity',
+};
 export const hostName = (host: string) => HOST_NAMES[host] ?? host;
 
 export const usageFile = () =>
@@ -364,6 +368,7 @@ export const SOLO_SKILLS = [
   'solo-verify-change',
   'solo-finish-change',
   'solo-configure-project',
+  'solo-maintain-context',
   'solo-prevent-mistake',
   'solo-compare-plugin',
   'solo-show-usage',

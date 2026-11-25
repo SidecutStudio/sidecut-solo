@@ -159,6 +159,8 @@ export async function packageErrors(root: string): Promise<string[]> {
   for (const agent of files.filter((f) => /^agents\/[^/]+\.md$/.test(f))) {
     const meta = frontmatter(await readFile(join(root, agent), 'utf8'));
     if (!meta?.name || !meta.description) errors.push(`${agent}: needs name and description`);
+    if (!Array.isArray(meta?.tools) || meta.tools.length === 0)
+      errors.push(`${agent}: needs an explicit tools list`);
   }
   for (const profile of files.filter((f) => /^codex\/agents\/[^/]+\.toml$/.test(f))) {
     try {
