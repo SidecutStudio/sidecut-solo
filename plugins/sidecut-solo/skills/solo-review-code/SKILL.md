@@ -1,6 +1,6 @@
 ---
 name: solo-review-code
-description: "Reviews code for defects and delivery risks. Use for a diff, branch, PR or safe-to-merge verdict. Not for rendered design (use solo-review-design) or merging (use solo-deliver-change)."
+description: "Reviews code for defects and delivery risks. Use when asked to review a diff, branch or PR or give a safe-to-merge verdict. Not for rendered design (use solo-review-design) or merging (use solo-deliver-change)."
 argument-hint: "[PR number, branch or base..head]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)

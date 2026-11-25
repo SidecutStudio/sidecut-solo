@@ -1,6 +1,6 @@
 ---
 name: solo-compare-plugin
-description: "Compares plugin sessions and controlled runs from recorded evidence. Use to dogfood a plugin or compare plugin versions or presence. Not for product QA (use solo-test-behavior)."
+description: "Compares plugin sessions and controlled runs from recorded evidence. Use when asked to dogfood a plugin or compare versions or presence. Not for product QA (use solo-test-behavior)."
 argument-hint: "[session or comparison]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" qa-check *)

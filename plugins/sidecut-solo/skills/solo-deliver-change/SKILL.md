@@ -1,6 +1,6 @@
 ---
 name: solo-deliver-change
-description: "Delivers authorized work through project checks, merge and cleanup. Use to merge a PR, ship a change or resume interrupted delivery. Not for a review verdict (use solo-review-code)."
+description: "Delivers authorized work through project checks, merge and cleanup. Use when asked to merge a PR, ship a change or resume delivery. Not for a review verdict (use solo-review-code)."
 argument-hint: "[PR number or branch]"
 allowed-tools:
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
