@@ -17,7 +17,7 @@ Turn an open question into a recommendation grounded in this project. Keep settl
 5. Find the premise that would defeat the leading approach. Read [premise-checks.md](references/premise-checks.md) and make the smallest real observation that could disprove it.
 6. For a new page, site or visual identity, use [directions.md](references/directions.md). For drafts judged without knowing their makers, use [bake-off.md](references/bake-off.md). For priorities, rank value against cost and name what would change the order.
 7. Recommend one approach and the cheapest experiment that could prove it wrong. Separate facts from unresolved assumptions. Before presenting the recommendation, use `server/data/visual-reports.md` from the loaded plugin root for visual comparisons and bakeoff galleries.
-8. If progress depends on the user choosing, show the comparison and ask for that choice. For advice alone, give the recommendation and next useful step. Continue through `solo-plan-change` or `solo-build-change` when implementation is authorized and the choice is settled.
+8. If progress depends on the user choosing, deliver the comparison and links in a completed response first so they are visible before any question prompt that would hide them, then ask for that choice (`server/data/user-input.md` from the loaded plugin root). For advice alone, give the recommendation and next useful step. Continue through `solo-plan-change` or `solo-build-change` when implementation is authorized and the choice is settled.
 
 ## Rules
 

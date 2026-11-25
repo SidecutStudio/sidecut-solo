@@ -100,10 +100,12 @@ test.each(USER_INPUT_POINTERS)('%s points to the packaged user-input guide', asy
   expect(text).toContain(pointer);
 });
 
-test('the packaged user-input guide keeps both hosts and the permission rule', async () => {
+test('the packaged user-input guide keeps both hosts, Antigravity turn ordering and the permission rule', async () => {
   const guidance = await readFile(join(PLUGIN, 'server/data/user-input.md'), 'utf8');
   expect(guidance).toContain('AskUserQuestion');
   expect(guidance).toContain('request_user_input');
+  expect(guidance).toContain('ask_question');
+  expect(guidance).toContain('completed chat turn first');
   expect(guidance).toContain('cannot satisfy a separate plan approval');
 });
 
