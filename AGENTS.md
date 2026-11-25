@@ -51,7 +51,7 @@ dogfood/            scrubbed example records; the full history is in the private
 - Rebuild bundles, notices, dashboard output and profiles after changing their sources. Commit generated output with its source change.
 - Add release notes to the root CHANGELOG and run `npm exec --no -- sidecut-version <version>` to generate the package and host versions. Keep the copied README and LICENSE aligned for installed-content changes.
 - Preserve all required checks in `solo-workflow.toml`. Every check must pass on the exact reviewed current PR head before merging.
-- Use solo-finish-change for delivery. Missing, skipped, cancelled, queued or failed checks never count as success.
+- Use solo-deliver-change for delivery. Missing, skipped, cancelled, queued or failed checks never count as success.
 - Preserve unrelated work, unique commits and files. Remove only task-created resources whose content is proven preserved.
 - Reuse current-task permission. After `check` and `secrets` pass on main, Release publishes the manifest version if it has no release yet, so a merge of a version bump has publication effect `automatic`. You give standing permission for that release with merge permission here: pass `--publication-authorized`.
 - Confirm requested merges, tags, releases, archives, checksums, deployments and installed updates separately before claiming completion.

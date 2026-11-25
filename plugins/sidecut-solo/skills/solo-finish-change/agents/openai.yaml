@@ -1,7 +1,0 @@
-interface:
-  display_name: "Finish change"
-  short_description: "Completes checks, delivery and cleanup under repository rules."
-  icon_small: "../../assets/icon.png"
-  icon_large: "../../assets/icon.png"
-  brand_color: "#FF6B00"
-  default_prompt: "Use $solo-finish-change to complete checks, delivery and cleanup under repository rules."

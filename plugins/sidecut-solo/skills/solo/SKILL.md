@@ -18,16 +18,16 @@ Carry the user's requested outcome through the needed skills. Read the selected 
 | Find an unexplained failure's cause | `solo-diagnose-problem` |
 | Sequence settled work with checks | `solo-plan-change` |
 | Implement a feature or fix | `solo-build-change` |
-| Exercise a real user journey | `solo-verify-change` |
+| QA, dogfood or test a product flow | `solo-test-behavior` |
 | Critique rendered screens | `solo-review-design` |
 | Write or fix words people read, or make text stop sounding like AI | `solo-write-copy` |
-| Review code and challenge findings | `solo-review-change` |
-| Complete, merge and clean up authorized work | `solo-finish-change` |
+| Review a diff or ask whether a PR is safe to merge | `solo-review-code` |
+| Complete, merge and clean up authorized work | `solo-deliver-change` |
 | Inspect unfinished work without changing it | `solo-list-work` |
 | Set project checks and delivery settings | `solo-configure-project` |
 | Create a context pack, scaffold standards or refresh project review docs | `solo-maintain-context` |
 | Prevent a recurring project mistake | `solo-prevent-mistake` |
-| Record plugin use or compare controlled runs | `solo-compare-plugin` |
+| Dogfood a plugin or compare controlled runs | `solo-compare-plugin` |
 | See what ran, what it cost and whether usage is recorded | `solo-show-usage` |
 
 When the user asks for a hands-off run ("lfg", "hands off", "run it end to end"), follow `server/data/hands-off.md` from the loaded plugin root before the first skill. It answers decisions for the user and leaves the merge policy and every gate in place.
@@ -36,7 +36,7 @@ Reuse settled decisions and permission throughout the task. For a material decis
 
 When several routes fit, choose the smallest chain that completes the request. Read [orchestration.md](references/orchestration.md) for handoffs and [helpers-and-hosts.md](references/helpers-and-hosts.md) for host behavior.
 
-A request to merge always reaches `solo-finish-change`, including review then merge. Missing delivery checks do not prevent diagnosis, fixes or review.
+A request to merge always reaches `solo-deliver-change`, including review then merge. Missing delivery checks do not prevent diagnosis, fixes or review.
 
 Use independent agents only when the host, repository and user permit them. Keep small jobs with one agent and never repeat another worker's assigned work.
 

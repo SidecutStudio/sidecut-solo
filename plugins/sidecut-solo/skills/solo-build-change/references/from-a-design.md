@@ -24,7 +24,7 @@ Build in working slices. Compare rendered screenshots at the reference sizes and
 
 Use screenshot differences when the reference is a screenshot at the same dimensions.
 
-Apply solo-verify-change page checks for other widths, themes, contrast, overflow and touch targets.
+Use `solo-test-behavior` to exercise controls at affected widths. Use `solo-review-design` to compare the rendered layout, themes, contrast and touch targets.
 
 Use solo-review-design before delivery.
 

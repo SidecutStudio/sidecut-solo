@@ -1,0 +1,7 @@
+interface:
+  display_name: "Deliver change"
+  short_description: "Delivers authorized work through project checks, merge and cleanup."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-deliver-change to deliver authorized work through project checks, merge and cleanup."

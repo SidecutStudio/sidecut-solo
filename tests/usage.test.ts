@@ -157,7 +157,7 @@ test('an idle gap ends a skill run, and the Solo section names unused skills and
   const text = soloReport(records, [], new Date(0));
   expect(text).toContain('sessions using Solo: 2');
   expect(text).toContain(
-    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-list-work, solo-review-change, solo-review-design, solo-verify-change, solo-finish-change, solo-configure-project, solo-maintain-context, solo-prevent-mistake, solo-compare-plugin, solo-show-usage, solo-write-copy',
+    'skills that never started: solo-choose-approach, solo-research-topic, solo-plan-change, solo-diagnose-problem, solo-list-work, solo-review-code, solo-review-design, solo-test-behavior, solo-deliver-change, solo-configure-project, solo-maintain-context, solo-prevent-mistake, solo-compare-plugin, solo-show-usage, solo-write-copy',
   );
   expect(text).toContain('only the router started (it may have done the work itself): 1');
   expect(text).toContain('desktop app reports typed');
@@ -240,10 +240,13 @@ test('Solo coverage normalizes historical skills across all install namespaces w
     ['solo-build', 'solo-build-change'],
     ['solo-troubleshoot', 'solo-diagnose-problem'],
     ['solo-status', 'solo-list-work'],
-    ['solo-review', 'solo-review-change'],
+    ['solo-review', 'solo-review-code'],
+    ['solo-review-change', 'solo-review-code'],
+    ['solo-verify-change', 'solo-test-behavior'],
+    ['solo-finish-change', 'solo-deliver-change'],
     ['solo-design-review', 'solo-review-design'],
-    ['solo-verify', 'solo-verify-change'],
-    ['solo-finish', 'solo-finish-change'],
+    ['solo-verify', 'solo-test-behavior'],
+    ['solo-finish', 'solo-deliver-change'],
     ['solo-setup', 'solo-configure-project'],
     ['solo-improve-workflow', 'solo-prevent-mistake'],
     ['solo-check-status', 'solo-list-work'],
@@ -299,7 +302,7 @@ const codexLogs = {
         {
           logRecords: [
             ['codex.skill_invocation', 'explicit', 'solo-build-change'],
-            ['codex.skill_invocation', 'implicit', 'solo-review-change'],
+            ['codex.skill_invocation', 'implicit', 'solo-review-code'],
           ]
             .map(([event, type, skill]) => ({
               timeUnixNano: at,
@@ -413,7 +416,7 @@ test('the report covers both hosts, tokens by model and says cost is Claude Code
   );
   expect(text).toContain('Claude Code  1 sessions, 1 skill runs, 2 tool calls, 0 tokens, $0.25');
   expect(text).toContain('sidecut-solo:solo-build-change  explicit 1');
-  expect(text).toContain('sidecut-solo:solo-review-change  implicit 1');
+  expect(text).toContain('sidecut-solo:solo-review-code  implicit 1');
   expect(text).toContain('solo get_settings  1 calls, 0 failed, 40 ms');
   expect(text).toContain('gpt-6.1-sol  1,000 input, 200 output, 600 cached');
   const solo = soloReport(records, [], new Date(0));

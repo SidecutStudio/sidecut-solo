@@ -93,11 +93,11 @@ test('the deep-review workflow flags the same files as the helper', async () => 
 describe('a visual change invoked through review gets the design pass', () => {
   test('design review is its own skill, and the method lives only there', () => {
     expect(read('skills/solo-review-design/SKILL.md')).toContain('name: solo-review-design');
-    expect(existsSync(join(PLUGIN, 'skills/solo-review-change/references/design.md'))).toBe(false);
+    expect(existsSync(join(PLUGIN, 'skills/solo-review-code/references/design.md'))).toBe(false);
   });
 
   test('review checks for files people see and runs both reviews, or says design was skipped', () => {
-    const review = read('skills/solo-review-change/SKILL.md');
+    const review = read('skills/solo-review-code/SKILL.md');
     expect(review).toContain('solo user-facing');
     expect(review).toContain('solo-review-design');
     expect(review).toMatch(
@@ -111,7 +111,7 @@ describe('a visual change invoked through review gets the design pass', () => {
     for (const path of [
       'skills/solo/SKILL.md',
       'skills/solo-build-change/SKILL.md',
-      'skills/solo-finish-change/SKILL.md',
+      'skills/solo-deliver-change/SKILL.md',
     ])
       expect(read(path)).toContain('solo-review-design');
     for (const path of ['agents/reviewer.md', 'codex/agents/solo-reviewer.toml'])

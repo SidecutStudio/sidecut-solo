@@ -59,7 +59,7 @@ Only the repository's generator changes protected paths. Invalid settings block 
 
 `worktrees` chooses always, when-overlapping or never. Under never, overlapping edits need a safe decision rather than a hidden alternate worktree.
 
-`review` chooses auto, deep or light. A standard review runs on `review_model` in Claude Code (default `sonnet`) or `codex_review_model` in Codex (default the parent's model), at `review_effort` on both (low, medium or high; default `medium`). solo-review-change explains the levels and how to pass them.
+`review` chooses auto, deep or light. A standard review runs on `review_model` in Claude Code (default `sonnet`) or `codex_review_model` in Codex (default the parent's model), at `review_effort` on both (low, medium or high; default `medium`). solo-review-code explains the levels and how to pass them.
 
 ## Agents
 

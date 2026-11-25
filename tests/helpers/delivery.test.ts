@@ -559,7 +559,7 @@ describe('merge', () => {
       'publishes a release the user has not allowed',
     ])
       expect(result.stderr).toContain(reason);
-    expect(result.stderr).toContain('skills/solo-finish-change/SKILL.md');
+    expect(result.stderr).toContain('skills/solo-deliver-change/SKILL.md');
     // Missing permission keeps the provider untouched.
     expect(calls()).toEqual([]);
     // Without it, the same refusal also judges the PR at its head.

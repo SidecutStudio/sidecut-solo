@@ -1,0 +1,7 @@
+interface:
+  display_name: "Test behavior"
+  short_description: "Tests what a product does through its real interface."
+  icon_small: "../../assets/icon.png"
+  icon_large: "../../assets/icon.png"
+  brand_color: "#FF6B00"
+  default_prompt: "Use $solo-test-behavior to test what a product does through its real interface."

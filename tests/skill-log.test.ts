@@ -167,7 +167,7 @@ test('the share line holds the version, the period and run counts only', () => {
     {
       time: '2026-11-01T12:00:00Z',
       plugin: 'sidecut-solo',
-      skill: 'solo-review-change',
+      skill: 'solo-review-code',
       host: 'claude-code',
     },
   ];
@@ -184,7 +184,7 @@ test('the share line holds the version, the period and run counts only', () => {
   ];
   const line = shareLine(records, runs, since, 1, '0.29.0');
   // The export covers Claude Code, so only the Codex hook-log run is added to it.
-  expect(line).toBe('Sidecut Solo 0.29.0, last 1 day: solo-finish-change 1, solo-plan-change 1');
+  expect(line).toBe('Sidecut Solo 0.29.0, last 1 day: solo-deliver-change 1, solo-plan-change 1');
   expect(line).not.toContain('secret-repo');
   expect(shareLine([], [], since, 7, '0.29.0')).toBe(
     'Sidecut Solo 0.29.0, last 7 days: no skill runs recorded',

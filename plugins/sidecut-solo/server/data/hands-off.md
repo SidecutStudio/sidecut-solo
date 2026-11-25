@@ -19,7 +19,7 @@ Record both answers in the task record. They hold for this task only, never for 
 - Follow-up offers at the end, such as fixing findings, saving a lesson or publishing, are still asked. Never pick one for the user.
 - Keep a short "Decided for you" list: each decision, what you chose and how to reverse it.
 - Run the same chain, checks and review levels as a supervised task. Hands-off removes the questions and leaves every gate in place.
-- On a failed required check, use solo-finish-change's CI repair, which has its own limit.
+- On a failed required check, use solo-deliver-change's CI repair, which has its own limit.
 
 ## Stop and ask
 
