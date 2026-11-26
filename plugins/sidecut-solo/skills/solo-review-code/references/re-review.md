@@ -4,7 +4,7 @@ Read this when fixes, a rebase or a target-branch merge change the head.
 
 Every new head needs its own review.
 
-Use a scoped review only when the original review covered a committed head and was not a multi-agent review. After a deep-level review, use one only when it found no blocker or major findings.
+Use a scoped review only when the original review covered a committed head and was not a multi-agent review. After a deep-level review, use one only when its report found no blocker or major findings, fixed or not; the saved record's blocking count doesn't show this.
 
 Require the reviewed commit to remain an ancestor of the new head, and require the merge base with the target to remain unchanged.
 
