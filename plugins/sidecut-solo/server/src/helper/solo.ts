@@ -380,7 +380,7 @@ function inlineReview(args: Parsed) {
  * The review a merge relies on: a JSON file, the same four fields given inline, or the review
  * `solo review` saved for HEAD.
  */
-function reviewFrom(args: Parsed, repo: string): object {
+function reviewFrom(args: Parsed, repo: string, base?: string): object {
   const inline = ['reviewed-head', 'reviewer', 'review-notes', 'blocking-findings'].filter(
     (name) => args[name] !== undefined,
   );
@@ -393,7 +393,7 @@ function reviewFrom(args: Parsed, repo: string): object {
   const head = inventory(repo).head;
   const saved = loadReview(repo, head);
   if (saved) return saved;
-  const below = lastReviewedBefore(repo, head);
+  const below = lastReviewedBefore(repo, head, base);
   throw new WorkflowError(
     below
       ? `merge: ${unreviewedCommits(below.head, below.after, head)}`
@@ -410,8 +410,8 @@ function brief(repo: string, settings: ReturnType<typeof load>['config']): strin
   const policy = settings.merge ?? DEFAULTS.merge;
   return [
     `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
-    `Push with \`solo push\`, then \`solo checks <pr> --reviewed-head <full sha>\`; every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
-    `Record the review of that head with \`solo review --reviewed-head <sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Run \`solo checks <pr> --reviewed-head <full sha>\`: every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
     `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
     'Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.',
     `Repo: ${repo}`,
@@ -626,7 +626,7 @@ async function main(argv: string[]): Promise<number> {
       } else if (command === 'run') {
         result = await run(store, args.key as string, args.rest, Number(args.timeout ?? 120));
       } else if (command === 'merge') {
-        const review = reviewFrom(args, repo);
+        const review = reviewFrom(args, repo, settings.base_branch);
         const resolved = permission();
         if (resolved.merge_vetoed)
           throw new WorkflowError('repo settings set merge = "never"; configuration veto');

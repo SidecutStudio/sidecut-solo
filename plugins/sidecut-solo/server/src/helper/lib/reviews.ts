@@ -77,13 +77,22 @@ export function commitsAfter(repo: string, reviewed: string, head: string): numb
   return count.code ? undefined : Number(count.stdout.trim());
 }
 
-/** The saved review nearest below `head`, for saying which commits still need one. */
-export function lastReviewedBefore(repo: string, head: string) {
+/**
+ * The saved review nearest below `head`, for saying which commits still need one. Reviews of
+ * commits already on the base branch belong to earlier PRs, so they never count.
+ */
+export function lastReviewedBefore(repo: string, head: string, base?: string) {
   const dir = reviewDir(repo);
   if (!existsSync(dir)) return undefined;
+  const baseRef = base
+    ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].find(
+        (ref) => !gitRun(repo, ['rev-parse', '--verify', '--quiet', ref]).code,
+      )
+    : undefined;
   let best: { head: string; after: number } | undefined;
   for (const name of readdirSync(dir)) {
     const sha = name.replace(/\.json$/, '');
+    if (baseRef && !gitRun(repo, ['merge-base', '--is-ancestor', sha, baseRef]).code) continue;
     const after = commitsAfter(repo, sha, head);
     if (after !== undefined && (!best || after < best.after)) best = { head: sha, after };
   }
@@ -93,5 +102,5 @@ export function lastReviewedBefore(repo: string, head: string) {
 /** The refusal for a review that sits below the head being merged. */
 export function unreviewedCommits(reviewed: string, after: number, head: string): string {
   const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
-  return `${after} commit${after === 1 ? '' : 's'} after the reviewed head ${reviewed.slice(0, 12)} have no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
+  return `${after} commit${after === 1 ? '' : 's'} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? 'has' : 'have'} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
 }

@@ -980,31 +980,48 @@ describe('saved reviews and stacked PRs', () => {
     expect(result.code).toBe(0);
   }, 30_000);
 
+  test("a review of a commit already on the base branch isn't named for a new branch", () => {
+    const { repo } = makeRepo();
+    writeFileSync(join(repo, 'solo-workflow.toml'), 'base_branch = "main"\n');
+    writeFileSync(join(repo, '.git/info/exclude'), 'solo-workflow.toml\n');
+    expect(review(repo, inventory(repo).head).code).toBe(0);
+    git(repo, ['switch', '-c', 'next']);
+    commit(repo, 'new.txt', 'new\n', 'a new change');
+    const result = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(result.stderr).toContain('needs a review');
+    expect(result.stderr).not.toContain('after the reviewed head');
+  });
+
   test('a stacked PR waits for the one below it, and a merge names the PRs stacked on it', () => {
     const { repo } = makeRepo();
     writeFileSync(join(repo, 'solo-workflow.toml'), 'base_branch = "main"\n');
     writeFileSync(join(repo, '.git/info/exclude'), 'solo-workflow.toml\n');
     const head = inventory(repo).head;
     expect(review(repo, head).code).toBe(0);
-    const pr = (base: string) => ({
-      ...restPr(head),
-      head: { sha: head, ref: 'step-2' },
-      base: { ref: base },
+    const here = { full_name: 'o/r' };
+    const fork = { full_name: 'someone/r' };
+    const side = (ref: string, repo = here) => ({ ref, repo });
+    const pr = (base: string, merged = false) => ({
+      ...restPr(head, merged),
+      head: { sha: head, ...side('step-2') },
+      base: side(base),
+    });
+    const open = (number: number, headRef: string, base: string, repo = here) => ({
+      number,
+      head: side(headRef, repo),
+      base: side(base),
     });
     const list = [
-      { number: 1, head: { ref: 'step-1' }, base: { ref: 'main' } },
-      { number: 2, head: { ref: 'step-2' }, base: { ref: 'step-1' } },
-      { number: 3, head: { ref: 'step-3' }, base: { ref: 'step-2' } },
+      open(1, 'step-1', 'main'),
+      open(2, 'step-2', 'step-1'),
+      open(3, 'step-3', 'step-2'),
+      open(4, 'release', 'main', fork),
     ];
-    const rules = (base: string) => [
-      { args: ['api', OPEN_LIST], replies: [{ stdout: list }] },
+    const rules = (base: string, pages = [list]) => [
+      { args: ['api', OPEN_LIST], replies: [{ stdout: pages }] },
       {
         args: ['api', PR],
-        replies: [
-          { stdout: pr(base) },
-          { stdout: pr(base) },
-          { stdout: { ...pr(base), ...restPr(head, true), head: { sha: head, ref: 'step-2' } } },
-        ],
+        replies: [{ stdout: pr(base) }, { stdout: pr(base) }, { stdout: pr(base, true) }],
       },
       ...provider(head).slice(1),
     ];
@@ -1012,6 +1029,10 @@ describe('saved reviews and stacked PRs', () => {
     const refused = cli(['--repo', repo, 'merge', '1', ...flags]);
     expect(refused.stderr).toContain('is stacked on PR 1 (step-1): merge PR 1 first');
     expect(calls().some((call) => call[1] === '--method')).toBe(false);
+
+    // A fork's branch named like this PR's base is not a PR below it.
+    fakeGh(rules('release', [[open(4, 'release', 'main', fork)]]));
+    expect(cli(['--repo', repo, 'merge', '1', ...flags]).stderr).not.toContain('stacked');
 
     calls = fakeGh(rules('main'));
     const merged = cli(['--repo', repo, 'merge', '1', ...flags]);

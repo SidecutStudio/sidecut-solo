@@ -15,7 +15,6 @@ import {
 import { safeText } from './present.ts';
 import {
   commitsAfter,
-  loadReview,
   type Review,
   reviewProblems,
   saveReview,
@@ -203,7 +202,9 @@ function viewPr(repo: string, pr: string): Json {
     url: raw?.html_url,
     headRefOid: raw?.head?.sha,
     headRefName: raw?.head?.ref,
+    headRepo: raw?.head?.repo?.full_name,
     baseRefName: raw?.base?.ref,
+    baseRepo: raw?.base?.repo?.full_name,
     state: raw?.merged_at ? 'MERGED' : String(raw?.state ?? '').toUpperCase(),
     mergeable:
       raw?.mergeable === true ? 'MERGEABLE' : raw?.mergeable === false ? 'CONFLICTING' : 'UNKNOWN',
@@ -362,18 +363,34 @@ export function gate(
   return { allowed: !reasons.length, reasons, head };
 }
 
-/** Open PRs in the PR's repository, as number, head branch and base branch; null when unreadable. */
-function openPrs(
-  repo: string,
-  pr: string,
-): { number: number; head: string; base: string }[] | null {
+type OpenPr = { number: number; head: string; base: string; sameRepo: boolean };
+
+/**
+ * Open PRs in the PR's repository, as number, head branch, base branch and whether the head branch
+ * lives in that repository (a fork's branch can share a name with one here). Null when unreadable.
+ */
+function openPrs(repo: string, pr: string): OpenPr[] | null {
   const api = prApi(pr);
   try {
-    const listed = gh(repo, ['api', ...api.host, `${api.repoPath}/pulls?state=open&per_page=100`]);
-    if (!Array.isArray(listed)) return null;
-    return listed
+    const pages = gh(repo, [
+      'api',
+      ...api.host,
+      `${api.repoPath}/pulls?state=open&per_page=100`,
+      '--paginate',
+      '--slurp',
+    ]);
+    if (!Array.isArray(pages)) return null;
+    return pages
+      .flatMap((page: Json) => (Array.isArray(page) ? page : [page]))
       .filter((item: Json) => item?.number && item.head?.ref && item.base?.ref)
-      .map((item: Json) => ({ number: item.number, head: item.head.ref, base: item.base.ref }));
+      .map((item: Json) => ({
+        number: item.number,
+        head: item.head.ref,
+        base: item.base.ref,
+        sameRepo:
+          Boolean(item.head.repo?.full_name) &&
+          item.head.repo.full_name === item.base.repo?.full_name,
+      }));
   } catch {
     return null;
   }
@@ -475,13 +492,13 @@ export function merge(
           ]),
     );
     // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
-    const open = openPrs(store.repo, pr);
+    const base = baseBranch || defaultBranch(store.repo, 'origin');
     const prBase = evidence.pr?.baseRefName as string | undefined;
-    if (baseBranch && prBase && prBase !== baseBranch) {
-      const below = open?.find((item) => item.head === prBase);
+    if (base && prBase && prBase !== base) {
+      const below = openPrs(store.repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
       if (below)
         reasons.push(
-          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${baseBranch} and review its new head`,
+          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${base} and review its new head`,
         );
     }
     if (reasons.length) throw new WorkflowError(`Merge blocked: ${reasons.join('; ')}`);
@@ -554,11 +571,10 @@ export function merge(
     }
     Object.assign(intent, { status: 'verified', after });
     // The merge is the review record's proof of use; keep one for this head either way.
-    if (!loadReview(store.repo, actual.head)) {
-      try {
-        saveReview(store.repo, review);
-      } catch {}
-    }
+    // The saved record says what this merge relied on, even if an older one was there.
+    try {
+      saveReview(store.repo, review);
+    } catch {}
     // A verified merge is finished history; only started/uncertain intents block a new merge.
     data.merge_history = [...(data.merge_history ?? []), intent];
     delete data.merge_intent;
@@ -567,6 +583,9 @@ export function merge(
     store.save(data);
     // PRs stacked on the merged branch now point at a branch that is done; name each next step.
     const headRef = evidence.pr?.headRefName as string | undefined;
+    const fromHere =
+      Boolean(evidence.pr?.headRepo) && evidence.pr.headRepo === evidence.pr.baseRepo;
+    const open = headRef && fromHere ? openPrs(store.repo, pr) : null;
     const stacked =
       headRef && open
         ? open

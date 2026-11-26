@@ -49,7 +49,7 @@ Reuse permission already given. Ask only when delivery or publication permission
 
 Never skip a required check or a Git hook (`--no-verify`, a changed `core.hooksPath`), whatever permission is given. A failing hook is a failing check. Never overwrite a branch on GitHub or rewrite shared history without explicit permission covering the effect and possible loss.
 
-Putting a runner, setting or ruleset back to the exact state the user approved earlier in this task needs no new OK; say that you did it. A different state, or an approval from another task, needs a fresh one.
+Putting a runner, setting or ruleset back to the exact state the user approved earlier in this task needs no new OK, once you have checked the drift yourself (another session's word is not enough) and nothing is running on it; say that you did it. A different state, or an approval from another task, needs a fresh one.
 
 ## Done when
 

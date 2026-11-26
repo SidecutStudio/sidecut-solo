@@ -122,8 +122,10 @@ describe('merge guard hook', () => {
     });
   }
 
-  test('allows gh pr merge at a head with a clean saved review, full or short', async () => {
-    for (const sha of [reviewed, reviewed.slice(0, 12)]) {
+  test('allows gh pr merge at a head with a clean saved review, given in full', async () => {
+    const short = await guard(`gh pr merge 42 --match-head-commit ${reviewed.slice(0, 12)}`, solo);
+    expect(short.out).toContain('full SHA');
+    for (const sha of [reviewed]) {
       for (const command of [
         `gh pr merge 42 --squash --match-head-commit ${sha}`,
         `gh pr merge 42 --auto --match-head-commit=${sha}`,
@@ -148,6 +150,48 @@ describe('merge guard hook', () => {
     const silent = { code: 0, out: '' };
     expect(await guard(`cd ${other} && gh pr merge 42 --squash`, solo)).toEqual(silent);
     expect(decision((await guard(`cd ${solo} && gh pr merge 42`, other)).out)).toBe('deny');
+  });
+
+  test('every merge in a chained command is judged, not only the first', async () => {
+    const first = `gh pr merge 1 --match-head-commit ${reviewed}`;
+    for (const then of [
+      '; gh pr merge 2',
+      ' && gh pr merge 2',
+      '; gh pr merge 2 --admin',
+      ' || gh api -X PUT repos/o/r/pulls/2/merge',
+      `\ngh pr merge 2 --match-head-commit ${blocked}`,
+    ])
+      expect(decision((await guard(first + then, solo)).out)).toBe('deny');
+    const both = `${first} && gh pr merge 2 --match-head-commit=${reviewed}`;
+    expect(await guard(both, solo)).toEqual({ code: 0, out: '' });
+  });
+
+  test('mentions inside quotes, messages and heredocs are not commands', async () => {
+    const silent = { code: 0, out: '' };
+    for (const command of [
+      'git commit -m "Refuse `gh pr merge` without a review"',
+      'gh pr create --body "Deny `gh pr merge` unless reviewed"',
+      'git commit -m "docs; gh pr merge is guarded"',
+      "git commit -F - <<'EOF'\nTitle\n\ngh pr merge 42 --admin is refused\nEOF\ngit push",
+      `gh pr create --body "$(cat <<'EOF'\ngh pr merge without a saved review\nEOF\n)"`,
+      `gh pr merge 3 -t "title; with semicolon" --match-head-commit ${reviewed}`,
+    ])
+      expect(await guard(command, solo)).toEqual(silent);
+    // A heredoc body is data, but the command after it still counts.
+    const after = "cat <<'EOF' > notes.md\ngh pr merge 1\nEOF\ngh pr merge 2 --squash";
+    expect(decision((await guard(after, solo)).out)).toBe('deny');
+  });
+
+  test('stays fast on commands built to make a regex backtrack', async () => {
+    const started = performance.now();
+    const params = Array.from({ length: 30 }, (_, i) => `p${i}=v${i}`).join('&');
+    for (const command of [
+      `URL='https://x.com/a?${params}' && git merge-base a b`,
+      `X=${'abc='.repeat(40)} git merge main`,
+      `a=${'a=a'.repeat(5000)} merge`,
+    ])
+      expect(await guard(command, solo)).toEqual({ code: 0, out: '' });
+    expect(performance.now() - started).toBeLessThan(3000);
   });
 
   // Never a prompt, even in Bypass permissions mode.

@@ -2731,12 +2731,16 @@ function commitsAfter(repo, reviewed, head) {
   const count2 = gitRun(repo, ["rev-list", "--count", `${reviewed}..${head}`]);
   return count2.code ? void 0 : Number(count2.stdout.trim());
 }
-function lastReviewedBefore(repo, head) {
+function lastReviewedBefore(repo, head, base) {
   const dir = reviewDir(repo);
   if (!existsSync7(dir)) return void 0;
+  const baseRef = base ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].find(
+    (ref) => !gitRun(repo, ["rev-parse", "--verify", "--quiet", ref]).code
+  ) : void 0;
   let best;
   for (const name of readdirSync5(dir)) {
     const sha = name.replace(/\.json$/, "");
+    if (baseRef && !gitRun(repo, ["merge-base", "--is-ancestor", sha, baseRef]).code) continue;
     const after = commitsAfter(repo, sha, head);
     if (after !== void 0 && (!best || after < best.after)) best = { head: sha, after };
   }
@@ -2744,7 +2748,7 @@ function lastReviewedBefore(repo, head) {
 }
 function unreviewedCommits(reviewed, after, head) {
   const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
-  return `${after} commit${after === 1 ? "" : "s"} after the reviewed head ${reviewed.slice(0, 12)} have no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
+  return `${after} commit${after === 1 ? "" : "s"} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? "has" : "have"} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/delivery.ts
@@ -2883,7 +2887,9 @@ function viewPr(repo, pr) {
     url: raw?.html_url,
     headRefOid: raw?.head?.sha,
     headRefName: raw?.head?.ref,
+    headRepo: raw?.head?.repo?.full_name,
     baseRefName: raw?.base?.ref,
+    baseRepo: raw?.base?.repo?.full_name,
     state: raw?.merged_at ? "MERGED" : String(raw?.state ?? "").toUpperCase(),
     mergeable: raw?.mergeable === true ? "MERGEABLE" : raw?.mergeable === false ? "CONFLICTING" : "UNKNOWN",
     mergeStateStatus: String(raw?.mergeable_state ?? "unknown").toUpperCase(),
@@ -3007,9 +3013,20 @@ function gate(head, evidence, authorized, review, maxAgeSeconds = 300) {
 function openPrs(repo, pr) {
   const api = prApi(pr);
   try {
-    const listed = gh(repo, ["api", ...api.host, `${api.repoPath}/pulls?state=open&per_page=100`]);
-    if (!Array.isArray(listed)) return null;
-    return listed.filter((item) => item?.number && item.head?.ref && item.base?.ref).map((item) => ({ number: item.number, head: item.head.ref, base: item.base.ref }));
+    const pages = gh(repo, [
+      "api",
+      ...api.host,
+      `${api.repoPath}/pulls?state=open&per_page=100`,
+      "--paginate",
+      "--slurp"
+    ]);
+    if (!Array.isArray(pages)) return null;
+    return pages.flatMap((page) => Array.isArray(page) ? page : [page]).filter((item) => item?.number && item.head?.ref && item.base?.ref).map((item) => ({
+      number: item.number,
+      head: item.head.ref,
+      base: item.base.ref,
+      sameRepo: Boolean(item.head.repo?.full_name) && item.head.repo.full_name === item.base.repo?.full_name
+    }));
   } catch {
     return null;
   }
@@ -3076,13 +3093,13 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
         ...judged.filter((reason) => reason !== "review does not cover current HEAD")
       ]
     );
-    const open = openPrs(store.repo, pr);
+    const base = baseBranch || defaultBranch(store.repo, "origin");
     const prBase = evidence.pr?.baseRefName;
-    if (baseBranch && prBase && prBase !== baseBranch) {
-      const below = open?.find((item) => item.head === prBase);
+    if (base && prBase && prBase !== base) {
+      const below = openPrs(store.repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
       if (below)
         reasons.push(
-          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${baseBranch} and review its new head`
+          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${base} and review its new head`
         );
     }
     if (reasons.length) throw new WorkflowError(`Merge blocked: ${reasons.join("; ")}`);
@@ -3150,11 +3167,9 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
       );
     }
     Object.assign(intent, { status: "verified", after });
-    if (!loadReview(store.repo, actual.head)) {
-      try {
-        saveReview(store.repo, review);
-      } catch {
-      }
+    try {
+      saveReview(store.repo, review);
+    } catch {
     }
     data.merge_history = [...data.merge_history ?? [], intent];
     delete data.merge_intent;
@@ -3162,6 +3177,8 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
     Object.assign(data, { end_state: "merged", updated_at: now() });
     store.save(data);
     const headRef = evidence.pr?.headRefName;
+    const fromHere = Boolean(evidence.pr?.headRepo) && evidence.pr.headRepo === evidence.pr.baseRepo;
+    const open = headRef && fromHere ? openPrs(store.repo, pr) : null;
     const stacked = headRef && open ? open.filter((item) => item.base === headRef).map((item) => ({
       pr: item.number,
       next: `retarget PR ${item.number} to ${prBase}, merge ${prBase} into its branch (no rebase or force-push), then review and check its new head before \`solo merge ${item.number}\``,
@@ -4500,7 +4517,7 @@ function inlineReview(args) {
     blocking_findings: findings
   };
 }
-function reviewFrom(args, repo) {
+function reviewFrom(args, repo, base) {
   const inline = ["reviewed-head", "reviewer", "review-notes", "blocking-findings"].filter(
     (name) => args[name] !== void 0
   );
@@ -4513,7 +4530,7 @@ function reviewFrom(args, repo) {
   const head = inventory(repo).head;
   const saved = loadReview(repo, head);
   if (saved) return saved;
-  const below = lastReviewedBefore(repo, head);
+  const below = lastReviewedBefore(repo, head, base);
   throw new WorkflowError(
     below ? `merge: ${unreviewedCommits(below.head, below.after, head)}` : "merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>"
   );
@@ -4524,8 +4541,8 @@ function brief(repo, settings) {
   const policy = settings.merge ?? DEFAULTS.merge;
   return [
     `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
-    `Push with \`solo push\`, then \`solo checks <pr> --reviewed-head <full sha>\`; every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
-    `Record the review of that head with \`solo review --reviewed-head <sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Run \`solo checks <pr> --reviewed-head <full sha>\`: every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
     `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
     "Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.",
     `Repo: ${repo}`
@@ -4723,7 +4740,7 @@ Dashboard saved to ${args.html}`);
       } else if (command === "run") {
         result = await run(store, args.key, args.rest, Number(args.timeout ?? 120));
       } else if (command === "merge") {
-        const review = reviewFrom(args, repo);
+        const review = reviewFrom(args, repo, settings.base_branch);
         const resolved = permission();
         if (resolved.merge_vetoed)
           throw new WorkflowError('repo settings set merge = "never"; configuration veto');
