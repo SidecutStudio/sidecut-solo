@@ -4,7 +4,7 @@ Read this when fixes, a rebase or a target-branch merge change the head.
 
 Every new head needs its own review.
 
-Use a scoped review only when the original review covered a committed head and was not a deep-level or multi-agent review.
+Use a scoped review only when the original review covered a committed head and was not a multi-agent review. After a deep-level review, use one only when it found no blocker or major findings.
 
 Require the reviewed commit to remain an ancestor of the new head, and require the merge base with the target to remain unchanged.
 
@@ -22,4 +22,4 @@ After a rebase, use git range-diff as supporting evidence, then examine conflict
 
 Return to full review when fixes rewrite much of the change or touch previously uncovered code.
 
-After fixes to a deep-level or multi-agent review, require another review at that depth or a full review before reporting ready.
+After fixes to a multi-agent review, or to blocker or major findings from a deep-level review, require another full review at that depth before reporting ready.

@@ -34,4 +34,6 @@ Say which model and effort ran in the review record.
 Follow [re-review.md](re-review.md) to decide whether a scoped review covers the new head.
 
 - **After a light or standard review:** review the fix diff alone. Its level is what `solo user-facing --base <reviewed-head> --head <new-head>` suggests. That is still never below what the fix diff itself calls for.
-- **After a deep review:** review the full change again at deep. A deep review is never followed by a lighter one before merge.
+- **After a deep review with blocker or major findings:** review the full change again at deep.
+- **After a deep review with only minor findings:** review the fix diff alone, at the level `solo user-facing --base <reviewed-head> --head <new-head>` suggests. That is still deep when the fix diff touches a deep area.
+- **Cap:** run at most three full deep rounds on one change. If the third still finds blocker or major findings, report them and ask the user before a fourth. Minors left after the cap go in the report as known gaps or follow-ups.
