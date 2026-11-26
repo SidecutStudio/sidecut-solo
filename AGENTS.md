@@ -29,7 +29,7 @@ scripts/
 evals/
 tests/
 docs/specification.md
-dogfood/            scrubbed example records; the full history is in the private sidecut-solo-dogfood repo
+dogfood/            scrubbed example records; the full history is in the private sidecut-evals repo
 ```
 
 ## Rules
@@ -59,7 +59,7 @@ dogfood/            scrubbed example records; the full history is in the private
 - CI runs `check` and `secrets` on GitHub-hosted Linux, and `gate` is the required check. Keep actions and downloaded tools pinned.
 - Keep usage logging, the local dashboard and helper refusal reporting available.
 - Never store prompts, commands, secret values or account credentials in usage logs. Check the receiver's allowlist before changing recorded fields.
-- Historical dogfood and session records live in the private `SidecutStudio/sidecut-solo-dogfood` repo; keep them unchanged there. `dogfood/` here holds only scrubbed examples with placeholder names. Save new records there only when requested, and distinguish observations from attribution.
+- Historical dogfood and session records live in the private sidecut-evals repo (`records/`); keep them unchanged there. `evals/` is generated from the same repo: edit the cases there and sync, and `evals-source.json` makes `npm run check` fail on an edit here. `dogfood/` here holds only scrubbed examples with placeholder names. Save new records there only when requested, and distinguish observations from attribution.
 - Keep personal overrides in ignored `solo-workflow.local.toml`. Never write global host configuration through project setup.
 - Install Claude plugins through account-synced marketplaces or user scope. Do not enable repository plugin overrides.
 - Keep current guidance here and product facts in the specification. Replace stale text rather than adding status ledgers or migration archives.
