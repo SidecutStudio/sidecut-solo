@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.40.2] - 2026-11-26
+
+### Changed
+
+- `solo-maintain-context` scaffolded standards and review docs at `docs/coding-standards.md` and `docs/review.md` in a repo whose checks limit its top-level files, such as a plugin repo checked by `sidecut-check`, and its drift check pointed to the helper launcher.
+- `solo-show-usage` listed `get_usage` in `allowed-tools`, since it reads it.
+
+### Fixed
+
+- `solo docs-check` reported a backticked path to a file or folder that a commit deleted from a top-level folder no longer in the repo. It had skipped any path whose first folder wasn't in the repo, so docs pointing into a removed folder passed. A same-named path that was never here, and a line that tells the history (removed, moved, renamed and the like), stay unreported.
+
 ## [0.40.1] - 2026-11-25
 
 ### Fixed

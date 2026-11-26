@@ -2,7 +2,7 @@
   "$schema": "https://antigravity.google/schemas/v1/plugin.json",
   "name": "sidecut-solo",
   "displayName": "Sidecut Solo",
-  "version": "0.40.1",
+  "version": "0.40.2",
   "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
   "logo": "assets/icon.png",
   "suggestedPrompts": [
