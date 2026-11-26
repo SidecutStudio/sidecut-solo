@@ -4329,7 +4329,10 @@ var COMMANDS = {
         kind: "string",
         about: "review JSON file; or give the review inline with the next four; without either, the review saved for HEAD"
       },
-      "reviewed-head": { kind: "string", about: "full SHA the review covered" },
+      "reviewed-head": {
+        kind: "string",
+        about: "full SHA the review covered; alone, uses the review `review` saved for it"
+      },
       reviewer: { kind: "string", choices: ["same-agent", "independent", "user"] },
       "review-notes": { kind: "string", about: "what was reviewed and found" },
       "blocking-findings": {
@@ -4526,6 +4529,14 @@ function reviewFrom(args, repo, base) {
     if (inline.length)
       throw new WorkflowError("merge: give --review or the inline review, not both");
     return json(args.review);
+  }
+  if (inline.length === 1 && inline[0] === "reviewed-head") {
+    const named = args["reviewed-head"];
+    const saved2 = loadReview(repo, named);
+    if (saved2) return saved2;
+    throw new WorkflowError(
+      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`
+    );
   }
   if (inline.length) return inlineReview(args);
   const head = inventory(repo).head;

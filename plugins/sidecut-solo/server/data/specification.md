@@ -173,7 +173,7 @@ Validate findings and try to disprove serious claims. Size review to the change:
 
 Each host sets the reviewer's model and effort explicitly: Claude Code passes `review_model` and `review_effort`; Codex passes `review_effort` as `reasoning_effort` and `codex_review_model` when set; Gemini/Antigravity passes `Model: "flash"` on standard review and `inherit` on deep. The review record names what ran.
 
-Every changed head requires another review. Scoped re-review requires a committed review below the deep level, preserved ancestry and an unchanged merge base.
+Every changed head requires another review. Scoped re-review requires a committed review other than a multi-agent one, preserved ancestry and an unchanged merge base; after a deep review it also requires that review to have found no blocker or major findings. A scoped re-review covers the fix diff at the level the helper suggests for it. A scoped review with blocker or major findings sends the whole change back to full review. Only deep reviews of the whole change count as full deep rounds: if the third still has blocker or major findings, the user decides on a fourth, and minors left after the cap are reported as known gaps or follow-ups.
 
 Visible changes require rendered design review unless excluded by the user or unavailable. State missing design coverage at the report's start with its reason.
 

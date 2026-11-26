@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.41.2] - 2026-11-26
+
+### Fixed
+
+- `solo merge --reviewed-head SHA` with no other review flags uses the review `solo review` saved for that commit, instead of asking for all four review fields again.
+
+## [0.41.1] - 2026-11-26
+
+### Changed
+
+- After a deep review that found only minor issues, the fixes get a review of the fix diff alone, at the level the helper suggests for it, instead of another full deep pass. Blocker or major findings still send the whole change back to deep review. One change gets at most three full deep rounds; a fourth needs the user's OK, and minors left after that go in the report as known gaps or follow-ups. A merge-guard rewrite had gone through six full deep reviews, the last one only for small fixes to minor edge cases.
+
 ## [0.41.0] - 2026-11-26
 
 ### Changed
