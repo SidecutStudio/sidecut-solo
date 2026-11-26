@@ -124,7 +124,11 @@ const runsFile = (words) => {
   const name = base(run[0]);
   if (/^(\.{1,2}|~)?\//.test(run[0] ?? '') && !/^(gh|git)$/.test(name)) return true;
   if (name === 'source' || name === '.') return run.length > 1;
-  return SHELLS.has(name) && !run.some((w) => SCRIPT_FLAG.test(w)) && run.slice(1).some((w) => !w.startsWith('-'));
+  return (
+    SHELLS.has(name) &&
+    !run.some((w) => SCRIPT_FLAG.test(w)) &&
+    run.slice(1).some((w) => !w.startsWith('-'))
+  );
 };
 
 // Options whose value is a message, not a script: git commit/tag/merge -m and gh's text options.
@@ -343,8 +347,7 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
   const fileRun = feeding || local.some((cmd) => runsFile(cmd.words));
   const pipedAt = new Array(local.length).fill(false);
   for (let n = local.length - 2; n >= 0; n--)
-    pipedAt[n] =
-      local[n].sep === '|' && (feedsShell(local[n + 1].words) || pipedAt[n + 1]);
+    pipedAt[n] = local[n].sep === '|' && (feedsShell(local[n + 1].words) || pipedAt[n + 1]);
   for (let n = 0; n < local.length; n++) {
     const cmd = local[n];
     // Bash runs each part of a pipeline, and a background job, in a subshell of its own.
@@ -487,7 +490,9 @@ const judge = (merge, dir) => {
 
 let reason = '';
 try {
-  const found = command.length > MAX_LENGTH ? ((unreadable = true), []) : commands(command);
+  let found = [];
+  if (command.length > MAX_LENGTH) unreadable = true;
+  else found = commands(command);
   for (const { words, scoped } of found) {
     const w = program(words);
     if (w[0] === 'cd') {
