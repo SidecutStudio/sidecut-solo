@@ -3,16 +3,60 @@
 // unless it names the reviewed head and `solo review` saved a clean review of it. The helper's own
 // merge calls gh directly, not through the shell, so it never meets this hook.
 //
-// The command is split into simple commands the way a shell would (quotes, escapes, heredocs,
-// `bash -c` and `$(...)`), in one linear pass, and every one of them is judged. Text inside quotes,
-// heredoc bodies and commit messages is never read as a command.
+// The command is split into simple commands the way a shell would, and every one of them is judged,
+// including what `$(...)`, backticks, `bash -c`, `eval` and a heredoc fed to a shell would run.
+// Single-quoted text, comments and other heredoc bodies, such as a commit message, are data.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-/** Simple commands in `text`, each a list of words, in order. `$(...)` and `bash -c` nest. */
+const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh']);
+const MAX_DEPTH = 40;
+
+/** Where the `"` opened at `j` closes, skipping escapes and `$(...)` inside it. */
+function closeQuote(text, j, depth) {
+  for (let k = j + 1; k < text.length; k++) {
+    if (text[k] === '\\') k++;
+    else if (text[k] === '"') return k;
+    else if (text[k] === '$' && text[k + 1] === '(') k = closeParen(text, k, depth + 1);
+  }
+  return text.length;
+}
+
+/** Where the `$(` opened at `i` closes, skipping quotes and escapes inside it. */
+function closeParen(text, i, depth = 0) {
+  if (depth > MAX_DEPTH) return text.length;
+  let level = 0;
+  for (let j = i + 1; j < text.length; j++) {
+    const c = text[j];
+    if (c === '\\') j++;
+    else if (c === "'") {
+      const k = text.indexOf("'", j + 1);
+      j = k < 0 ? text.length : k;
+    } else if (c === '"') j = closeQuote(text, j, depth);
+    else if (c === '(') level++;
+    else if (c === ')' && --level === 0) return j;
+  }
+  return text.length;
+}
+
+/** Where the backtick opened at `i` closes. */
+function closeTick(text, i) {
+  for (let j = i + 1; j < text.length; j++) {
+    if (text[j] === '\\') j++;
+    else if (text[j] === '`') return j;
+  }
+  return text.length;
+}
+
+/**
+ * Simple commands in `text`, each a list of words, in order, the way a shell would split them.
+ * What a shell would run is included: `$(...)` and backticks (quoted or not), `bash -c`, `eval`
+ * and heredocs fed to a shell. Single-quoted text, comments and other heredoc bodies are data.
+ */
 function commands(text, depth = 0) {
+  if (depth > MAX_DEPTH) return [];
   const out = [];
   let words = [];
   let word = '';
@@ -27,6 +71,10 @@ function commands(text, depth = 0) {
     endWord();
     if (words.length) out.push(words);
     words = [];
+  };
+  const substitute = (inner) => {
+    out.push(...commands(inner, depth + 1));
+    word += '$()';
   };
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
@@ -44,46 +92,67 @@ function commands(text, depth = 0) {
     }
     if (c === '"') {
       quoted = true;
-      for (i++; i < text.length && text[i] !== '"'; i++) {
-        if (text[i] === '\\' && i + 1 < text.length) word += text[++i];
-        else word += text[i];
+      const close = closeQuote(text, i, depth);
+      for (let k = i + 1; k < close; k++) {
+        if (text[k] === '\\' && k + 1 < close) word += text[++k];
+        else if (text[k] === '$' && text[k + 1] === '(') {
+          const end = closeParen(text, k, depth);
+          substitute(text.slice(k + 2, end));
+          k = end;
+        } else if (text[k] === '`') {
+          const end = Math.min(closeTick(text, k), close);
+          substitute(text.slice(k + 1, end));
+          k = end;
+        } else word += text[k];
       }
+      i = close;
       continue;
     }
-    if (c === '$' && text[i + 1] === '(' && depth < 4) {
-      // Unquoted command substitution: judge what runs inside it.
-      let level = 0;
-      let j = i + 1;
-      for (; j < text.length; j++) {
-        if (text[j] === '(') level++;
-        else if (text[j] === ')' && --level === 0) break;
-      }
-      out.push(...commands(text.slice(i + 2, j), depth + 1));
-      word += '$()';
-      i = j;
+    if (c === '$' && text[i + 1] === '(') {
+      const end = closeParen(text, i, depth);
+      substitute(text.slice(i + 2, end));
+      i = end;
+      continue;
+    }
+    if (c === '`') {
+      const end = closeTick(text, i);
+      substitute(text.slice(i + 1, end));
+      i = end;
+      continue;
+    }
+    if (c === '#' && !word && !quoted) {
+      const nl = text.indexOf('\n', i);
+      i = (nl < 0 ? text.length : nl) - 1;
       continue;
     }
     if (c === '<' && text[i + 1] === '<' && text[i + 2] !== '<') {
-      // Heredoc: remember its delimiter; the body after the line end is data.
-      const m = /^<<-?[ \t]*(['"]?)([A-Za-z_][\w-]*)\1/.exec(text.slice(i));
+      // Heredoc: its body starts after this line and is data unless a shell reads it.
+      const m = /^<<-?[ \t]*(['"]?)([A-Za-z_][\w-]*)\1/.exec(text.slice(i, i + 200));
       if (m) {
-        heredocs.push(m[2]);
+        endWord();
+        heredocs.push({ tag: m[2], owner: words });
         i += m[0].length - 1;
         continue;
       }
     }
     if (c === '\n') {
       endCommand();
-      for (const tag of heredocs) {
-        const end = new RegExp(`^[ \\t]*${tag}[ \\t]*$`, 'm');
+      for (const { tag, owner } of heredocs) {
         const rest = text.slice(i + 1);
-        const found = end.exec(rest);
+        const found = new RegExp(`^[ \\t]*${tag}[ \\t]*$`, 'm').exec(rest);
+        const body = found ? rest.slice(0, found.index) : rest;
+        const run = program(owner);
+        if (
+          SHELLS.has(run[0]?.split('/').pop()) &&
+          !run.some((w) => /^-[A-Za-z]*c[A-Za-z]*$/.test(w))
+        )
+          out.push(...commands(body, depth + 1));
         i = found ? i + 1 + found.index + found[0].length - 1 : text.length;
       }
       heredocs = [];
       continue;
     }
-    if (c === ';' || c === '&' || c === '|' || c === '(' || c === ')' || c === '`') {
+    if (c === ';' || c === '&' || c === '|' || c === '(' || c === ')') {
       endCommand();
       continue;
     }
@@ -94,18 +163,15 @@ function commands(text, depth = 0) {
     word += c;
   }
   endCommand();
-  // `bash -c '...'`: judge the script it runs.
+  // What `bash -c '...'` and `eval ...` run, behind any wrapper such as sudo or timeout.
   const nested = [];
   for (const cmd of out) {
-    const name = cmd[0]?.split('/').pop();
-    const flag = cmd.findIndex((w, k) => k > 0 && /^-[A-Za-z]*c[A-Za-z]*$/.test(w));
-    if (
-      ['bash', 'sh', 'zsh', 'dash'].includes(name) &&
-      flag > 0 &&
-      cmd[flag + 1] !== undefined &&
-      depth < 4
-    )
-      nested.push(...commands(cmd[flag + 1], depth + 1));
+    const run = program(cmd);
+    const name = run[0]?.split('/').pop();
+    if (name === 'eval') nested.push(...commands(run.slice(1).join(' '), depth + 1));
+    if (!SHELLS.has(name)) continue;
+    const flag = run.findIndex((w, k) => k > 0 && /^-[A-Za-z]*c[A-Za-z]*$/.test(w));
+    if (flag > 0 && run[flag + 1] !== undefined) nested.push(...commands(run[flag + 1], depth + 1));
   }
   return [...out, ...nested];
 }
@@ -120,24 +186,38 @@ const LEADS = new Set([
   'time',
   'command',
   'exec',
-  'nohup',
-  'sudo',
-  'xargs',
   '{',
   '}',
   '!',
 ]);
+// Wrappers that run the rest of the line, and their options that take a value.
+const WRAPPERS = {
+  sudo: ['-u', '-g', '-C', '-D', '-h', '-p', '-U', '-r', '-t'],
+  xargs: ['-I', '-L', '-n', '-P', '-d', '-E', '-s', '-a'],
+  nohup: [],
+  nice: ['-n'],
+  caffeinate: ['-t', '-w'],
+  stdbuf: [],
+  doas: ['-u', '-C'],
+  env: ['-u', '-C', '-S'],
+  timeout: ['-s', '-k', '--signal', '--kill-after'],
+};
 
-/** The words after any assignments and wrappers such as `timeout 60` or `env`. */
+/** The words after any assignments and wrappers such as `sudo -u x`, `timeout 60` or `env`. */
 function program(words) {
   let k = 0;
   while (k < words.length) {
     const w = words[k];
     if (/^[A-Za-z_]\w*=/.test(w) || LEADS.has(w)) k++;
-    else if (w === 'env') for (k++; k < words.length && words[k].startsWith('-'); k++);
-    else if (w === 'timeout') {
-      for (k++; k < words.length && words[k].startsWith('-'); k++);
-      k++;
+    else if (WRAPPERS[w]) {
+      const takes = WRAPPERS[w];
+      for (
+        k++;
+        k < words.length && (words[k].startsWith('-') || /^[A-Za-z_]\w*=/.test(words[k]));
+        k++
+      )
+        if (takes.includes(words[k])) k++;
+      if (w === 'timeout') k++; // its duration
     } else break;
   }
   return words.slice(k);
@@ -150,15 +230,38 @@ function skipRepo(words, k) {
   return k;
 }
 
-/** What kind of merge a command is, if any: { kind: 'pr', args } or { kind: 'api' }. */
+// gh pr merge options that take a value, so the value is never read as an option.
+const PR_MERGE_VALUES = new Set([
+  '-t',
+  '--subject',
+  '-b',
+  '--body',
+  '-F',
+  '--body-file',
+  '-A',
+  '--author-email',
+  '--match-head-commit',
+  '-R',
+  '--repo',
+]);
+
+/** What kind of merge a command is, if any: { kind: 'pr', admin, heads } or { kind: 'api' }. */
 function mergeOf(words) {
   const w = program(words);
   if (w[0]?.split('/').pop() !== 'gh') return null;
   let k = skipRepo(w, 1);
   if (w[k] === 'pr') {
     k = skipRepo(w, k + 1);
-    if (w[k] === 'merge') return { kind: 'pr', args: w.slice(k + 1) };
-    return null;
+    if (w[k] !== 'merge') return null;
+    let admin = false;
+    const heads = [];
+    for (let j = k + 1; j < w.length; j++) {
+      const [flag, inline] = w[j].startsWith('--') ? w[j].split(/=(.*)/s, 2) : [w[j], undefined];
+      if (flag === '--admin') admin = true;
+      if (flag === '--match-head-commit') heads.push((inline ?? w[j + 1] ?? '').toLowerCase());
+      if (PR_MERGE_VALUES.has(flag) && inline === undefined) j++;
+    }
+    return { kind: 'pr', admin, heads };
   }
   if (w[k] !== 'api') return null;
   const rest = w.slice(k + 1);
@@ -167,10 +270,10 @@ function mergeOf(words) {
   const put = rest.some(
     (a, j) =>
       /^(-X|--method)=?PUT$/i.test(a) ||
-      /^-XPUT$/i.test(a) ||
       ((a === '-X' || a === '--method') && /^PUT$/i.test(rest[j + 1] ?? '')),
   );
-  if (put && rest.some((a) => /(^|\/)pulls\/[0-9]+\/merge$/.test(a))) return { kind: 'api' };
+  if (put && rest.some((a) => /(^|\/)pulls\/[0-9]+\/merge\/?(\?.*)?$/.test(a)))
+    return { kind: 'api' };
   return null;
 }
 
@@ -179,12 +282,14 @@ for await (const chunk of process.stdin) input += chunk;
 try {
   const data = JSON.parse(input);
   const command = data.tool_input?.command ?? data.tool_input?.cmd ?? '';
-  if (typeof command !== 'string' || !command.replace(/\\/g, '').includes('merge')) process.exit(0);
+  if (typeof command !== 'string' || !command.replace(/[\\'"]/g, '').includes('merge'))
+    process.exit(0);
 
   let cwd = process.cwd();
   try {
     if (typeof data.cwd === 'string' && statSync(data.cwd).isDirectory()) cwd = data.cwd;
   } catch {}
+  const start = cwd;
   const gitOut = (dir, gitArgs) =>
     execFileSync('git', ['-C', dir, ...gitArgs], {
       encoding: 'utf8',
@@ -205,15 +310,11 @@ try {
     if (!existsSync(join(root, 'solo-workflow.toml'))) return '';
     if (merge.kind === 'api')
       return `Sidecut Solo refuses a merge through \`gh api\` here: it skips the reviewed-head, check and permission gates. ${helper}`;
-    const args = merge.args;
-    if (args.some((a) => a === '--admin' || a.startsWith('--admin=')))
+    if (merge.admin)
       return `Sidecut Solo refuses gh pr merge --admin: it asks GitHub to skip this repo's required checks and reviews. ${helper} If the user wants an admin merge, they run it themselves.`;
-    const at = args.findIndex(
-      (a) => a === '--match-head-commit' || a.startsWith('--match-head-commit='),
-    );
-    const sha = (
-      at < 0 ? '' : args[at].includes('=') ? args[at].split('=')[1] : (args[at + 1] ?? '')
-    ).toLowerCase();
+    if (new Set(merge.heads).size > 1)
+      return `Sidecut Solo refuses this merge: it names more than one --match-head-commit. Give only the head you reviewed. ${helper}`;
+    const sha = merge.heads[0] ?? '';
     if (!sha)
       return `Sidecut Solo refuses gh pr merge without --match-head-commit <reviewed sha> here: the PR could merge a head nobody reviewed. ${helper}`;
     if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha))
@@ -236,12 +337,17 @@ try {
   let reason = '';
   for (const words of commands(command)) {
     const w = program(words);
-    if (w[0] === 'cd' && w[1]) {
-      // A `cd` earlier in the same command decides which repo a later merge runs in.
-      const target = resolve(cwd, w[1].replace(/^~(?=\/|$)/, homedir()));
-      try {
-        if (statSync(target).isDirectory()) cwd = target;
-      } catch {}
+    if (w[0] === 'cd') {
+      // A `cd` earlier in the same command decides which repo a later merge runs in. One this
+      // can't follow (`cd -`, a variable) falls back to the session's folder.
+      const to = w[1] ?? '~';
+      if (to.startsWith('-') || to.includes('$')) cwd = start;
+      else {
+        const target = resolve(cwd, to.replace(/^~(?=\/|$)/, homedir()));
+        try {
+          if (statSync(target).isDirectory()) cwd = target;
+        } catch {}
+      }
       continue;
     }
     const merge = mergeOf(words);

@@ -84,15 +84,16 @@ export function commitsAfter(repo: string, reviewed: string, head: string): numb
 export function lastReviewedBefore(repo: string, head: string, base?: string) {
   const dir = reviewDir(repo);
   if (!existsSync(dir)) return undefined;
-  const baseRef = base
-    ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].find(
+  const baseRefs = base
+    ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].filter(
         (ref) => !gitRun(repo, ['rev-parse', '--verify', '--quiet', ref]).code,
       )
-    : undefined;
+    : [];
   let best: { head: string; after: number } | undefined;
   for (const name of readdirSync(dir)) {
     const sha = name.replace(/\.json$/, '');
-    if (baseRef && !gitRun(repo, ['merge-base', '--is-ancestor', sha, baseRef]).code) continue;
+    if (baseRefs.some((ref) => !gitRun(repo, ['merge-base', '--is-ancestor', sha, ref]).code))
+      continue;
     const after = commitsAfter(repo, sha, head);
     if (after !== undefined && (!best || after < best.after)) best = { head: sha, after };
   }

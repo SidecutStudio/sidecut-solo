@@ -169,18 +169,53 @@ describe('merge guard hook', () => {
   test('mentions inside quotes, messages and heredocs are not commands', async () => {
     const silent = { code: 0, out: '' };
     for (const command of [
-      'git commit -m "Refuse `gh pr merge` without a review"',
-      'gh pr create --body "Deny `gh pr merge` unless reviewed"',
+      "git commit -m 'Refuse `gh pr merge` without a review'",
+      "gh pr create --body 'Deny `gh pr merge` unless reviewed'",
+      'gh pr view 5 # then gh pr merge 5',
       'git commit -m "docs; gh pr merge is guarded"',
       "git commit -F - <<'EOF'\nTitle\n\ngh pr merge 42 --admin is refused\nEOF\ngit push",
       `gh pr create --body "$(cat <<'EOF'\ngh pr merge without a saved review\nEOF\n)"`,
       `gh pr merge 3 -t "title; with semicolon" --match-head-commit ${reviewed}`,
     ])
       expect(await guard(command, solo)).toEqual(silent);
+    // In double quotes a backtick runs its command, so the mention is a real merge.
+    const runs = 'git commit -m "Refuse `gh pr merge 5` without a review"';
+    expect(decision((await guard(runs, solo)).out)).toBe('deny');
     // A heredoc body is data, but the command after it still counts.
     const after = "cat <<'EOF' > notes.md\ngh pr merge 1\nEOF\ngh pr merge 2 --squash";
     expect(decision((await guard(after, solo)).out)).toBe('deny');
   });
+
+  // Each of these ran a merge that an earlier draft of the splitter missed.
+  const hidden = [
+    'out="$(gh pr merge 5 --admin)"',
+    "sudo bash -c 'gh pr merge 5 --admin'",
+    'timeout 60 bash -c "gh pr merge 5 --admin"',
+    "bash <<'EOF'\ngh pr merge 5 --admin\nEOF",
+    'out="$(gh pr merge 5 --squash)"',
+    'echo "`gh pr merge 5`"',
+    "nohup sh -c 'gh pr merge 5' &",
+    "xargs -I {} sh -c 'gh pr merge {}' < prs",
+    "env FOO=1 bash -c 'gh pr merge 5'",
+    'sh -s <<EOF\ngh pr merge 5\nEOF',
+    'x=$(printf ")"); gh pr merge 5',
+    "eval 'gh pr merge 5'",
+    'nice -n 5 gh pr merge 5',
+    'caffeinate -i gh pr merge 5',
+    'gh api -X PUT repos/o/r/pulls/5/merge?merge_method=squash',
+    'gh api -X PUT repos/o/r/pulls/5/merge/',
+    'gh pr merge 5 # --match-head-commit REVIEWED',
+    'gh pr merge 5 --body "--match-head-commit=REVIEWED"',
+    'gh pr merge 5 --match-head-commit REVIEWED --match-head-commit ' + 'b'.repeat(40),
+    'cd /tmp && cd - && gh pr merge 5',
+    "gh pr mer''ge 5",
+  ];
+  for (const command of hidden) {
+    test(`sees the merge in: ${command.replace(/\n/g, ' / ')}`, async () => {
+      const { out } = await guard(command.replaceAll('REVIEWED', reviewed), solo);
+      expect(decision(out)).toBe('deny');
+    });
+  }
 
   test('stays fast on commands built to make a regex backtrack', async () => {
     const started = performance.now();

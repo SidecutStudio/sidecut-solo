@@ -492,7 +492,12 @@ export function merge(
           ]),
     );
     // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
-    const base = baseBranch || defaultBranch(store.repo, 'origin');
+    // Without base_branch, the clone's own record of the remote default; no network under the lock.
+    const base =
+      baseBranch ||
+      gitRun(store.repo, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+        .stdout.trim()
+        .replace(/^origin\//, '');
     const prBase = evidence.pr?.baseRefName as string | undefined;
     if (base && prBase && prBase !== base) {
       const below = openPrs(store.repo, pr)?.find((item) => item.sameRepo && item.head === prBase);

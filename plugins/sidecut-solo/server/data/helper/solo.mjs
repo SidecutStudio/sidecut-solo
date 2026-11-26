@@ -2734,13 +2734,14 @@ function commitsAfter(repo, reviewed, head) {
 function lastReviewedBefore(repo, head, base) {
   const dir = reviewDir(repo);
   if (!existsSync7(dir)) return void 0;
-  const baseRef = base ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].find(
+  const baseRefs = base ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].filter(
     (ref) => !gitRun(repo, ["rev-parse", "--verify", "--quiet", ref]).code
-  ) : void 0;
+  ) : [];
   let best;
   for (const name of readdirSync5(dir)) {
     const sha = name.replace(/\.json$/, "");
-    if (baseRef && !gitRun(repo, ["merge-base", "--is-ancestor", sha, baseRef]).code) continue;
+    if (baseRefs.some((ref) => !gitRun(repo, ["merge-base", "--is-ancestor", sha, ref]).code))
+      continue;
     const after = commitsAfter(repo, sha, head);
     if (after !== void 0 && (!best || after < best.after)) best = { head: sha, after };
   }
@@ -3093,7 +3094,7 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
         ...judged.filter((reason) => reason !== "review does not cover current HEAD")
       ]
     );
-    const base = baseBranch || defaultBranch(store.repo, "origin");
+    const base = baseBranch || gitRun(store.repo, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]).stdout.trim().replace(/^origin\//, "");
     const prBase = evidence.pr?.baseRefName;
     if (base && prBase && prBase !== base) {
       const below = openPrs(store.repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
