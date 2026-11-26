@@ -336,16 +336,22 @@ describe('merge guard hook', () => {
     expect(await guard('', '', solo, 'not json')).toEqual({ code: 0, out: '' });
   });
 
-  test('both hosts register the same bypass guard and their own skill logging hook', async () => {
+  test('both hosts register the same bypass guard, turn guard and their own skill logging hook', async () => {
     const claude = JSON.parse(await readFile(join(PLUGIN, '.claude-plugin/plugin.json'), 'utf8'));
     const codex = JSON.parse(await readFile(join(PLUGIN, '.codex-plugin/plugin.json'), 'utf8'));
     expect(claude.hooks).toBeUndefined();
     expect(codex.hooks).toBe('./hooks/codex-hooks.json');
     expect(existsSync(join(PLUGIN, 'plugin.json'))).toBe(false);
     const hooks = JSON.parse(await readFile(join(PLUGIN, 'hooks', 'hooks.json'), 'utf8'));
-    expect(Object.keys(hooks.hooks).sort()).toEqual(['PostToolUse', 'PreToolUse']);
+    expect(Object.keys(hooks.hooks).sort()).toEqual([
+      'PostToolUse',
+      'PreToolUse',
+      'Stop',
+      'UserPromptSubmit',
+    ]);
     const codexHooks = JSON.parse(await readFile(join(PLUGIN, 'hooks/codex-hooks.json'), 'utf8'));
-    expect(codexHooks.hooks.PreToolUse).toEqual(hooks.hooks.PreToolUse);
+    for (const event of ['PreToolUse', 'Stop', 'UserPromptSubmit'])
+      expect(codexHooks.hooks[event]).toEqual(hooks.hooks[event]);
     const [group] = hooks.hooks.PreToolUse;
     expect(group.matcher).toBe('Bash');
     expect(group.hooks).toEqual([
@@ -353,6 +359,12 @@ describe('merge guard hook', () => {
         type: 'command',
         // biome-ignore lint/suspicious/noTemplateCurlyInString: the host fills this in, not JavaScript.
         command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use-merge-guard.mjs"',
+        timeout: 5,
+      },
+      {
+        type: 'command',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: the host fills this in, not JavaScript.
+        command: 'node "${CLAUDE_PLUGIN_ROOT}/hooks/pre-tool-use-automerge-handoff.mjs"',
         timeout: 5,
       },
     ]);

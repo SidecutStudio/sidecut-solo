@@ -1,8 +1,8 @@
 import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
 
 // plugins/sidecut-solo/server/src/helper/solo.ts
-import { readFileSync as readFileSync11, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join13 } from "node:path";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join14 } from "node:path";
 import { cwd } from "node:process";
 
 // plugins/sidecut-solo/server/src/helper/dashboard/page.ts
@@ -3667,7 +3667,7 @@ function docsCheck(repo, options = {}) {
   const problems2 = [];
   const missing = [];
   const texts = /* @__PURE__ */ new Map();
-  const read = (file) => {
+  const read2 = (file) => {
     if (!texts.has(file)) {
       try {
         texts.set(file, readFileSync8(join10(root2, file), "utf8"));
@@ -3680,7 +3680,7 @@ function docsCheck(repo, options = {}) {
   for (const file of docs) {
     const path = join10(root2, file);
     if (!statSync2(path).isFile() || statSync2(path).size > 1e6) continue;
-    const text = read(file);
+    const text = read2(file);
     const here = dirname4(file);
     const own = anchors(text);
     for (const [line, raw] of proseLines(text)) {
@@ -3739,7 +3739,7 @@ function docsCheck(repo, options = {}) {
           continue;
         }
         if (fragment && resolved.endsWith(".md") && !/^L\d+/.test(fragment)) {
-          const ids = resolved === file ? own : anchors(read(resolved));
+          const ids = resolved === file ? own : anchors(read2(resolved));
           if (!ids.has(fragment.toLowerCase()) && !ids.has(fragment)) {
             problems2.push({
               file,
@@ -3913,10 +3913,135 @@ async function run(store, key, argv, timeout = 120) {
   });
 }
 
-// plugins/sidecut-solo/server/src/helper/lib/qa.ts
-import { readFileSync as readFileSync9 } from "node:fs";
+// plugins/sidecut-solo/server/src/helper/lib/handoff.ts
+import { existsSync as existsSync11, readdirSync as readdirSync8, readFileSync as readFileSync9, rmSync as rmSync2 } from "node:fs";
 import { join as join11 } from "node:path";
-var SCHEMAS = join11(pluginRoot, "server", "data", "qa");
+function handoffDir(repo) {
+  return join11(commonDir(repo), "solo-handoffs");
+}
+function prNumber(pr) {
+  return /([1-9][0-9]*)$/.exec(pr)?.[1] ?? pr;
+}
+function recordsFor(repo, pr, branch) {
+  const dir = handoffDir(repo);
+  if (!existsSync11(dir)) return [];
+  const keys = /* @__PURE__ */ new Set([`pr-${prNumber(pr)}.json`]);
+  if (branch) keys.add(`branch-${branch.replace(/[^\w.-]/g, "_")}.json`);
+  return readdirSync8(dir).filter((name) => keys.has(name)).map((name) => join11(dir, name));
+}
+function read(path) {
+  try {
+    return JSON.parse(readFileSync9(path, "utf8"));
+  } catch {
+    return {};
+  }
+}
+var MERGE_LABEL = /auto[-_ ]?merge/i;
+function handedOff(repo, pr) {
+  const run2 = spawn(["gh", "pr", "view", pr, "--json", "labels,autoMergeRequest"], repo);
+  if (run2.code) return true;
+  try {
+    const view = JSON.parse(run2.stdout);
+    return Boolean(view.autoMergeRequest) || (view.labels ?? []).some((label) => MERGE_LABEL.test(label.name ?? ""));
+  } catch {
+    return true;
+  }
+}
+var sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
+  if (!/^[1-9][0-9]*$/.test(pr) && !/^https:\/\/[^\s]+\/pull\/[1-9][0-9]*$/.test(pr))
+    throw new WorkflowError("PR must be a positive number or an HTTPS pull-request URL");
+  if (!(timeoutS > 0) || !(intervalS > 0))
+    throw new WorkflowError("--timeout and --interval must be positive numbers of seconds");
+  const mine = join11(handoffDir(repo), `pr-${prNumber(pr)}.json`);
+  const claim = (paths) => {
+    const all = [.../* @__PURE__ */ new Set([mine, ...paths])];
+    const session = all.map((path) => read(path).session).find(Boolean);
+    for (const path of all)
+      atomicJson(path, {
+        ...read(path),
+        ...session ? { session } : {},
+        ref: prNumber(pr),
+        waiter: { pid: process.pid, at: now() }
+      });
+  };
+  claim([]);
+  const deadline = Date.now() + timeoutS * 1e3;
+  let result;
+  try {
+    while (!result) {
+      let seen;
+      try {
+        seen = collectChecks(repo, pr, require2);
+      } catch (error) {
+        if (!/head changed/.test(error.message)) throw error;
+        await sleep(intervalS * 1e3);
+        continue;
+      }
+      const view = seen.pr;
+      claim(recordsFor(repo, pr, view.headRefName));
+      const base = { pr: prNumber(pr), head: seen.head };
+      if (view.state === "MERGED") {
+        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        result = {
+          ...base,
+          status: "merged",
+          ...view.mergeCommit?.oid ? { merge_commit: view.mergeCommit.oid } : {},
+          next: "Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup."
+        };
+      } else if (view.state === "CLOSED") {
+        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        result = {
+          ...base,
+          status: "closed",
+          next: "The PR was closed without merging. Find out why before doing anything else with it."
+        };
+      } else if (!handedOff(repo, pr)) {
+        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        result = {
+          ...base,
+          status: "not-handed-off",
+          next: "Nothing will merge it: the PR has no merge label and no auto-merge. Merge through solo merge, or hand it off again and wait."
+        };
+      } else {
+        const failed = seen.required_checks.filter((check) => ["fail", "cancel"].includes(String(check.bucket))).map((check) => String(check.name));
+        if (failed.length)
+          result = {
+            ...base,
+            status: "check-failed",
+            failed_checks: failed,
+            next: "Repair the failing check (Deliver Change, ci-repair), or take the PR off automerge; then wait again."
+          };
+        else if (Date.now() + intervalS * 1e3 > deadline)
+          result = {
+            ...base,
+            status: "timeout",
+            next: "Still open with checks pending. Run solo wait-merge again to keep waiting."
+          };
+        else await sleep(intervalS * 1e3);
+      }
+    }
+  } finally {
+    for (const path of [mine, ...readdirSafe(repo)]) {
+      if (!existsSync11(path)) continue;
+      const record = read(path);
+      if (record.waiter?.pid === process.pid) {
+        delete record.waiter;
+        atomicJson(path, record);
+      }
+    }
+  }
+  return result;
+}
+function readdirSafe(repo) {
+  const dir = handoffDir(repo);
+  return existsSync11(dir) ? readdirSync8(dir).map((name) => join11(dir, name)) : [];
+}
+
+// plugins/sidecut-solo/server/src/helper/lib/qa.ts
+import { readFileSync as readFileSync10 } from "node:fs";
+import { join as join12 } from "node:path";
+var SCHEMAS = join12(pluginRoot, "server", "data", "qa");
 function typeMatches(type, value) {
   if (type === "null") return value === null;
   if (type === "array") return Array.isArray(value);
@@ -3982,7 +4107,7 @@ function schemaErrors(schema2, value, at = "$") {
   return errors;
 }
 function schema(name) {
-  return JSON.parse(readFileSync9(join11(SCHEMAS, `${name}.schema.json`), "utf8"));
+  return JSON.parse(readFileSync10(join12(SCHEMAS, `${name}.schema.json`), "utf8"));
 }
 function runProblems(scenario, run2) {
   const found = [
@@ -4098,7 +4223,7 @@ function comparePair(withRun, withoutRun) {
   return lines;
 }
 function qaCommand(command, paths) {
-  const [scenario, ...runs] = paths.map((path) => JSON.parse(readFileSync9(path, "utf8")));
+  const [scenario, ...runs] = paths.map((path) => JSON.parse(readFileSync10(path, "utf8")));
   const [first, second] = runs;
   const compare = command === "qa-compare";
   const found = compare ? pairProblems(scenario, first, second) : runProblems(scenario, first);
@@ -4114,8 +4239,8 @@ function qaCommand(command, paths) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/surface.ts
-import { readFileSync as readFileSync10 } from "node:fs";
-import { join as join12 } from "node:path";
+import { readFileSync as readFileSync11 } from "node:fs";
+import { join as join13 } from "node:path";
 var NOT_SEEN = [
   /(^|\/)(tests?|__tests__|e2e|fixtures|__snapshots__|node_modules|\.github)\//i,
   /^(dist|build|out)\//,
@@ -4211,7 +4336,7 @@ function userFacing(dir, base, head, policy) {
     ];
     changed = changedLines(from) + untracked.reduce((sum, p) => {
       try {
-        return sum + readFileSync10(join12(repo, p), "utf8").split("\n").length;
+        return sum + readFileSync11(join13(repo, p), "utf8").split("\n").length;
       } catch {
         return sum;
       }
@@ -4341,6 +4466,15 @@ var COMMANDS = {
       },
       method: { kind: "string", choices: MERGE_METHODS },
       ...AUTHORIZATION,
+      ...REQUIRE
+    },
+    positionals: ["pr"]
+  },
+  "wait-merge": {
+    help: "Wait for a PR handed to automerge to merge, close or fail a required check, then say what to do next",
+    options: {
+      timeout: { kind: "string", about: "seconds to wait before giving up (default 540)" },
+      interval: { kind: "string", about: "seconds between reads (default 30)" },
       ...REQUIRE
     },
     positionals: ["pr"]
@@ -4509,7 +4643,7 @@ function summary(data) {
   };
 }
 function json(path) {
-  return JSON.parse(readFileSync11(path, "utf8"));
+  return JSON.parse(readFileSync12(path, "utf8"));
 }
 function inlineReview(args) {
   const count2 = args["blocking-findings"];
@@ -4548,7 +4682,7 @@ function reviewFrom(args, repo, base) {
   );
 }
 function brief(repo, settings) {
-  const solo = `sh ${JSON.stringify(join13(pluginRoot, "server", "data", "helper", "solo"))}`;
+  const solo = `sh ${JSON.stringify(join14(pluginRoot, "server", "data", "helper", "solo"))}`;
   const checks = settings.required_checks?.length ? settings.required_checks.join(", ") : "the base branch's protection rules";
   const policy = settings.merge ?? DEFAULTS.merge;
   return [
@@ -4562,7 +4696,7 @@ function brief(repo, settings) {
 }
 var VERSION = (() => {
   try {
-    return json(join13(pluginRoot, ".codex-plugin", "plugin.json")).version ?? "?";
+    return json(join14(pluginRoot, ".codex-plugin", "plugin.json")).version ?? "?";
   } catch {
     return "?";
   }
@@ -4722,6 +4856,15 @@ Dashboard saved to ${args.html}`);
         args["reviewed-head"]
       );
       break;
+    case "wait-merge":
+      result = await waitMerge(
+        repo,
+        positional(0),
+        required,
+        Number(args.timeout ?? 540),
+        Number(args.interval ?? 30)
+      );
+      break;
     case "gate": {
       const resolved = permission();
       result = {
@@ -4797,7 +4940,7 @@ Dashboard saved to ${args.html}`);
   }
   console.log(JSON.stringify(result, null, 2));
   const status = result ?? {};
-  if (command === "gate" && !status.allowed || command === "docs-check" && !result.ok || command === "run" && !["passed", "reconciled"].includes(status.status ?? "")) {
+  if (command === "gate" && !status.allowed || command === "docs-check" && !result.ok || command === "run" && !["passed", "reconciled"].includes(status.status ?? "") || command === "wait-merge" && status.status !== "merged") {
     return 1;
   }
   return 0;
@@ -4818,7 +4961,7 @@ if (import.meta.main) {
     console.error(`Blocked: ${message}`);
     if (name === "merge")
       console.error(
-        `Merges follow Deliver Change, which lists every requirement: read ${join13(pluginRoot, "skills", "solo-deliver-change", "SKILL.md")}`
+        `Merges follow Deliver Change, which lists every requirement: read ${join14(pluginRoot, "skills", "solo-deliver-change", "SKILL.md")}`
       );
     process.exit(2);
   }
