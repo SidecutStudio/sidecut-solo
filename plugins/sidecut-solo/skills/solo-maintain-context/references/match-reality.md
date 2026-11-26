@@ -4,7 +4,7 @@ Read this when docs and instructions may have drifted from the code.
 
 ## Run the deterministic check
 
-Run `solo docs-check`, adding `--one-sentence-per-line` when the project keeps one sentence per line. It reports backticked paths that don't exist, relative links and `#anchors` that don't resolve, `run <script>` commands missing from `package.json`, and retired Solo names, each with its file and line. Fix each one, or say why it stays.
+Run `solo docs-check`, resolved through `server/data/helper-launcher.md` from the loaded plugin root, adding `--one-sentence-per-line` when the project keeps one sentence per line. It reports backticked paths that don't exist, including paths into a top-level folder a commit deleted, relative links and `#anchors` that don't resolve, `run <script>` commands missing from `package.json`, and retired Solo names, each with its file and line. Fix each one, or say why it stays.
 
 A path can exist and still be the wrong one, such as `tests/capture.test.ts` in a section about `actor/`, so read each path in its context.
 

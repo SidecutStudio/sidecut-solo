@@ -190,6 +190,23 @@ export function docsCheck(repo: string, options: { oneSentencePerLine?: boolean 
     [, owner = '', self = ''] = /([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(url) ?? [];
   } catch {}
   const top = new Set(files.map((file) => file.split('/')[0] as string));
+  // Top-level folders Git history shows were deleted: a doc pointing into one is stale, not a
+  // pointer to another repository.
+  const removed = new Set(
+    gitRun(root, [
+      'log',
+      '--no-renames',
+      '--diff-filter=D',
+      '--format=',
+      '--name-only',
+      '-n',
+      '2000',
+    ])
+      .stdout.split('\n')
+      .filter((file) => file.includes('/'))
+      .map((file) => file.split('/')[0] as string)
+      .filter((first) => !top.has(first)),
+  );
   const protectedPaths = load(root).config.protected_paths ?? [];
   const docs = files.filter(
     (file) =>
@@ -244,7 +261,7 @@ export function docsCheck(repo: string, options: { oneSentencePerLine?: boolean 
         const fromDoc = relative('.', join(here, token));
         const first = token.split('/')[0] as string;
         const relativeToDoc = token.startsWith('../') || (here !== '.' && exists(fromDoc));
-        if (!top.has(first) && !relativeToDoc) continue;
+        if (!top.has(first) && !removed.has(first) && !relativeToDoc) continue;
         if (!token.includes('/') && !/\.\w+$/.test(token) && !dirs.has(token)) continue;
         const ok = /[*?{]/.test(token)
           ? matchesGlob(token) || matchesGlob(fromDoc)

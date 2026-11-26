@@ -3521,6 +3521,17 @@ function docsCheck(repo, options = {}) {
   } catch {
   }
   const top = new Set(files.map((file) => file.split("/")[0]));
+  const removed = new Set(
+    gitRun(root2, [
+      "log",
+      "--no-renames",
+      "--diff-filter=D",
+      "--format=",
+      "--name-only",
+      "-n",
+      "2000"
+    ]).stdout.split("\n").filter((file) => file.includes("/")).map((file) => file.split("/")[0]).filter((first) => !top.has(first))
+  );
   const protectedPaths = load(root2).config.protected_paths ?? [];
   const docs = files.filter(
     (file) => DOC.test(file) && !NOT_DOCS.test(file) && !SKIP.test(`/${file}`) && !protectedPaths.includes(file)
@@ -3565,7 +3576,7 @@ function docsCheck(repo, options = {}) {
         const fromDoc = relative(".", join9(here, token));
         const first = token.split("/")[0];
         const relativeToDoc = token.startsWith("../") || here !== "." && exists(fromDoc);
-        if (!top.has(first) && !relativeToDoc) continue;
+        if (!top.has(first) && !removed.has(first) && !relativeToDoc) continue;
         if (!token.includes("/") && !/\.\w+$/.test(token) && !dirs.has(token)) continue;
         const ok = /[*?{]/.test(token) ? matchesGlob(token) || matchesGlob(fromDoc) : exists(token) || exists(fromDoc);
         if (!ok && !namesOtherRepo(raw, self, owner)) {

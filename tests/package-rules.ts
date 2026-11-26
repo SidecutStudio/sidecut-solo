@@ -54,6 +54,9 @@ const MCP_TOOL: Record<string, string> = {
   checks: 'get_pr_checks',
 };
 const mcpTool = (tool: string) => `mcp__plugin_sidecut-solo_solo__${tool}`;
+// Every Solo MCP tool is read-only, so a skill that names one in backticks pre-approves it too, as
+// sidecut-check's SKILL_ALLOWED_MCP_MISSING requires. get_usage has no helper command of its own.
+const NAMED_TOOLS = [...Object.values(MCP_TOOL), 'get_usage'];
 const BRAND = /^#[0-9A-F]{6}$/;
 
 function frontmatter(text: string): Record<string, unknown> | null {
@@ -131,14 +134,19 @@ export async function packageErrors(root: string): Promise<string[]> {
       else if (description.length > 400) errors.push(`${name}: description over 400`);
       const own = files.filter((f) => f.startsWith(`skills/${name}/`) && f.endsWith('.md'));
       const named = new Set<string>();
-      for (const file of own)
-        for (const [, command] of (await readFile(join(root, file), 'utf8')).matchAll(MENTION))
-          named.add(command as string);
+      const namedTools = new Set<string>();
+      for (const file of own) {
+        const body = await readFile(join(root, file), 'utf8');
+        for (const [, command] of body.matchAll(MENTION)) named.add(command as string);
+        for (const tool of NAMED_TOOLS) if (body.includes(`\`${tool}\``)) namedTools.add(tool);
+      }
       const commands = READ_ONLY.filter((c) => named.has(c));
       const expected = [
         ...commands.map(helperTool),
         ...commands.flatMap((c) => (MCP_TOOL[c] ? [mcpTool(MCP_TOOL[c])] : [])),
       ];
+      for (const tool of NAMED_TOOLS)
+        if (namedTools.has(tool) && !expected.includes(mcpTool(tool))) expected.push(mcpTool(tool));
       const tools = meta['allowed-tools'] ?? [];
       if (JSON.stringify(tools) !== JSON.stringify(expected))
         errors.push(`${name}: allowed-tools must be ${JSON.stringify(expected)}`);

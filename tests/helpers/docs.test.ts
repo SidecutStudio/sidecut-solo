@@ -71,6 +71,19 @@ describe('docs-check', () => {
     ]);
   });
 
+  test('reports a path into a top-level folder that a commit deleted', () => {
+    const { repo } = makeRepo();
+    write(repo, 'legacy/old.ts', '');
+    git(repo, ['add', '-A']);
+    git(repo, ['commit', '-m', 'add legacy']);
+    git(repo, ['rm', '-rq', 'legacy']);
+    git(repo, ['commit', '-m', 'remove legacy']);
+    write(repo, 'README.md', '# X\n\nSee `legacy/old.ts` and `elsewhere/thing.ts`.\n');
+    const result = check(repo);
+    // elsewhere/ never existed here, so it may name another repository's file.
+    expect(result.problems.map((p) => [p.kind, p.found])).toEqual([['path', 'legacy/old.ts']]);
+  });
+
   test('leaves existing, ignored, other-repo and historical paths alone', () => {
     const repo = project();
     write(
