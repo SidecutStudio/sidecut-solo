@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.40.3] - 2026-11-26
+
+### Changed
+
+- Moved onto sidecut-agentskills v2.7.0. Its checker now flags a skill that names one of its own plugin's read-only tools without listing it in `allowed-tools`, and Solo already passes it.
+- The usage-log hook now reads skill files through symlinks, so Antigravity on a Mac is logged when it opens a skill by a linked path.
+- `npm run eval` now trusts the staged copy of this plugin, so a background or CI run no longer stops at the trust prompt.
+
 ## [0.40.2] - 2026-11-26
 
 ### Changed
