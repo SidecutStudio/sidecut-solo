@@ -30,12 +30,14 @@ With `merge = "ask"`, ask once when ready unless the user already requested merg
 
 Use the finish skill's authorization method for release outputs. Keep merge, tag, release, deployment and installed-plugin update distinct.
 
+When a research, planning or read-only brief turns into build work, say so before building and offer it as its own session. Build here only once the user says to.
+
 ## Split independent work
 
 Split only when pieces need neither each other's files nor results and delegation is allowed. A small change stays with one agent.
 
 1. Give workers one shared brief in scratch space for substantial parallel work. A single read-only worker can receive its brief directly.
-2. Include the goal, granted permissions, verified facts, interfaces, repository rules, checks, ownership and stopping conditions.
+2. Include the goal, granted permissions, verified facts, interfaces, repository rules, checks, ownership and stopping conditions. Say whether proposing or making follow-ups is in scope. For a worker that delivers, paste the paragraph `solo brief` prints for its repo.
 3. Give editing workers separate branches and worktrees. Do not share files, branches or task records.
 4. If repository settings forbid worktrees, run editing pieces sequentially. Native workers inherit the host's actual sandbox and approval constraints.
 5. Keep an independent piece for the parent. Send corrections to the existing worker instead of duplicating its work.

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.41.0] - 2026-11-26
+
+### Changed
+
+- The merge guard now refuses any merge run outside the helper in a Solo repo, not only an admin merge, unless it is `gh pr merge --match-head-commit SHA` at a head with a clean saved review. It also follows a `cd` earlier in the same command. Agents and sub-agents had merged with plain `gh pr merge` and left no review behind.
+- `solo review` saves the review of one commit. `solo merge` reads it for the head, so the review no longer has to be retyped, and every merge leaves one behind.
+- `solo merge` refuses commits made after the reviewed head and names them, such as a fix pushed after the review.
+- `solo merge` refuses a PR stacked on another open PR until that one merges, and after a merge lists the PRs stacked on it with the command to retarget each. `solo-deliver-change` gives the order for merging a stack.
+- `solo brief` prints the paragraph a parent pastes into a sub-agent's brief so its delivery goes through the helper.
+- `solo-deliver-change` keeps waiting on a merge or release until it is confirmed, reruns a flaky job once per delivery rather than once per round, never skips Git hooks, and says when putting back a state the user approved earlier needs a fresh OK.
+- Orchestration briefs say whether follow-ups are in scope, and a research or read-only task that turns into build work is offered as its own session.
+
 ## [0.40.5] - 2026-11-26
 
 ### Fixed

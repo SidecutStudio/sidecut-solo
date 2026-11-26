@@ -33,6 +33,7 @@ const READ_ONLY = [
   'authorization',
   'merged',
   'checks',
+  'brief',
   'gate',
   'report',
   'qa-check',

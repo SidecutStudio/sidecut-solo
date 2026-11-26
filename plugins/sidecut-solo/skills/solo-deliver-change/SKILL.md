@@ -34,11 +34,11 @@ Bring the requested work to a verified end state while preserving everything the
 9. Run `solo docs-check` on the head. Fix the problems this change caused, such as a doc it edited or a path or script it renamed or removed, and report the rest without blocking.
    Run `solo user-facing` and use solo-review-design when needed. Record unavailable design coverage and its reason. Open Critical design findings block delivery.
 10. After fixes, review the new head as solo-review-code's after-fixes rules say. Name only workers that actually reviewed it. A same-agent reread remains same-agent, including heads that only merge main.
-11. Push through `solo push` and confirm that the PR head matches. Run `solo checks PR --reviewed-head SHA` for that exact commit.
-12. Require every configured check to pass. Missing, queued, skipped, cancelled, pending or failed checks block merge. Continue independent work while blocked. When a required check fails, repair it as [ci-repair.md](references/ci-repair.md) describes, at most two rounds.
+11. Push through `solo push` and confirm that the PR head matches. Save the review of that head with `solo review`, then run `solo checks PR --reviewed-head SHA` for that exact commit.
+12. Require every configured check to pass. Missing, queued, skipped, cancelled, pending or failed checks block merge. Continue independent work while blocked. When a required check fails, repair it as [ci-repair.md](references/ci-repair.md) describes: at most two rounds, and one rerun of a flaky job.
 13. Inspect automatic release, deployment and publication effects. Resolve existing merge, publication and host permission using `solo authorization`. Follow [delivery.md](references/delivery.md).
-14. Merge through `solo merge` with the exact review record. If repository rules require another merge workflow, follow its equivalent head and check gates.
-15. Confirm the provider reports merged and verify the merged head. Check every requested tag, release, asset, package, deployment and installed update separately.
+14. Merge through `solo merge`, which reads the saved review and refuses commits made after it. For stacked PRs, follow the order in [delivery.md](references/delivery.md#stacked-prs). If repository rules require another merge workflow, follow its equivalent head and check gates.
+15. Confirm the provider reports merged and verify the merged head. Check every requested tag, release, asset, package, deployment and installed update separately. Keep waiting on each until it is confirmed or fails; don't end the turn on a background wait.
 16. Clean only task-owned resources using [cleanup.md](references/cleanup.md), including the session's own host worktree once the merge is proven. Preserve every unique commit and file. Never force cleanup or delete another task's work.
 
 ## Rules
@@ -47,7 +47,9 @@ Resolve the plugin root and run `solo COMMAND` via `server/data/helper-launcher.
 
 Reuse permission already given. Ask only when delivery or publication permission remains missing, after preparing the concrete result. In a hands-off task under `merge = "ask"`, the merge answer recorded at its start (`server/data/hands-off.md`) is the merge permission. Follow `server/data/user-input.md` from the loaded plugin root.
 
-Never skip a required check, whatever permission is given. Never overwrite a branch on GitHub or rewrite shared history without explicit permission covering the effect and possible loss.
+Never skip a required check or a Git hook (`--no-verify`, a changed `core.hooksPath`), whatever permission is given. A failing hook is a failing check. Never overwrite a branch on GitHub or rewrite shared history without explicit permission covering the effect and possible loss.
+
+Putting a runner, setting or ruleset back to the exact state the user approved earlier in this task needs no new OK, once you have checked the drift yourself (another session's word is not enough) and nothing is running on it; say that you did it. A different state, or an approval from another task, needs a fresh one.
 
 ## Done when
 

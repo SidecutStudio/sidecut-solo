@@ -14,6 +14,13 @@ import {
 } from './git.ts';
 import { safeText } from './present.ts';
 import {
+  commitsAfter,
+  type Review,
+  reviewProblems,
+  saveReview,
+  unreviewedCommits,
+} from './reviews.ts';
+import {
   finished,
   type MergeIntent,
   now,
@@ -23,7 +30,6 @@ import {
   unstartedMerge,
 } from './state.ts';
 
-const REVIEWERS = ['same-agent', 'independent', 'user'];
 // `merged` statuses that prove a branch's content is already in the target.
 const PROVEN = ['ancestor', 'squash-merged', 'content-in-target', 'pr-merged'];
 
@@ -195,7 +201,10 @@ function viewPr(repo: string, pr: string): Json {
     number: raw?.number,
     url: raw?.html_url,
     headRefOid: raw?.head?.sha,
+    headRefName: raw?.head?.ref,
+    headRepo: raw?.head?.repo?.full_name,
     baseRefName: raw?.base?.ref,
+    baseRepo: raw?.base?.repo?.full_name,
     state: raw?.merged_at ? 'MERGED' : String(raw?.state ?? '').toUpperCase(),
     mergeable:
       raw?.mergeable === true ? 'MERGEABLE' : raw?.mergeable === false ? 'CONFLICTING' : 'UNKNOWN',
@@ -300,12 +309,7 @@ export function collectChecks(
   };
 }
 
-export type Review = {
-  head?: string;
-  reviewer?: string;
-  blocking_findings?: unknown;
-  notes?: string;
-};
+export type { Review };
 
 export function gate(
   head: string,
@@ -359,20 +363,37 @@ export function gate(
   return { allowed: !reasons.length, reasons, head };
 }
 
-/** What a review must state, whatever head it covers. */
-function reviewProblems(review: Review): string[] {
-  const reasons: string[] = [];
-  if (!REVIEWERS.includes(review.reviewer ?? '')) {
-    reasons.push('review must disclose reviewer as same-agent, independent or user');
+type OpenPr = { number: number; head: string; base: string; sameRepo: boolean };
+
+/**
+ * Open PRs in the PR's repository, as number, head branch, base branch and whether the head branch
+ * lives in that repository (a fork's branch can share a name with one here). Null when unreadable.
+ */
+function openPrs(repo: string, pr: string): OpenPr[] | null {
+  const api = prApi(pr);
+  try {
+    const pages = gh(repo, [
+      'api',
+      ...api.host,
+      `${api.repoPath}/pulls?state=open&per_page=100`,
+      '--paginate',
+      '--slurp',
+    ]);
+    if (!Array.isArray(pages)) return null;
+    return pages
+      .flatMap((page: Json) => (Array.isArray(page) ? page : [page]))
+      .filter((item: Json) => item?.number && item.head?.ref && item.base?.ref)
+      .map((item: Json) => ({
+        number: item.number,
+        head: item.head.ref,
+        base: item.base.ref,
+        sameRepo:
+          Boolean(item.head.repo?.full_name) &&
+          item.head.repo.full_name === item.base.repo?.full_name,
+      }));
+  } catch {
+    return null;
   }
-  const found = review.blocking_findings;
-  if (typeof found !== 'number' || !Number.isInteger(found) || found < 0)
-    reasons.push(
-      'review must state its blocking findings as a whole number (--blocking-findings <n>)',
-    );
-  else if (found) reasons.push(`review has ${found} unresolved blocking findings`);
-  if (!review.notes) reasons.push('review file needs notes on what was reviewed');
-  return reasons;
 }
 
 /** Where the PR head is checked out, when it isn't here: the fix for a HEAD mismatch. */
@@ -397,6 +418,7 @@ export function merge(
   method = 'squash',
   require: string[] = [],
   problems: string[] = [],
+  baseBranch?: string,
 ) {
   if (!(MERGE_METHODS as readonly string[]).includes(method)) {
     throw new WorkflowError('Merge method must be squash, merge or rebase');
@@ -456,7 +478,34 @@ export function merge(
     // Judge the PR at its own head, so a checkout elsewhere is one reason, not three.
     if (evidence.head !== actual.head)
       reasons.push(headElsewhere(store.repo, pr, actual.head, evidence.head));
-    reasons.push(...gate(evidence.head, evidence, authorized, review).reasons);
+    // Commits pushed after the review, such as a fix, need their own review before merging.
+    const unreviewed = review.head
+      ? commitsAfter(store.repo, review.head, evidence.head)
+      : undefined;
+    const judged = gate(evidence.head, evidence, authorized, review).reasons;
+    reasons.push(
+      ...(unreviewed === undefined
+        ? judged
+        : [
+            unreviewedCommits(review.head as string, unreviewed, evidence.head),
+            ...judged.filter((reason) => reason !== 'review does not cover current HEAD'),
+          ]),
+    );
+    // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
+    // Without base_branch, the clone's own record of the remote default; no network under the lock.
+    const base =
+      baseBranch ||
+      gitRun(store.repo, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])
+        .stdout.trim()
+        .replace(/^origin\//, '');
+    const prBase = evidence.pr?.baseRefName as string | undefined;
+    if (base && prBase && prBase !== base) {
+      const below = openPrs(store.repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
+      if (below)
+        reasons.push(
+          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${base} and review its new head`,
+        );
+    }
     if (reasons.length) throw new WorkflowError(`Merge blocked: ${reasons.join('; ')}`);
     // Host protection rules remain authoritative; no admin/auto/force switches.
     const intent: MergeIntent = {
@@ -526,13 +575,33 @@ export function merge(
       );
     }
     Object.assign(intent, { status: 'verified', after });
+    // The merge is the review record's proof of use; keep one for this head either way.
+    // The saved record says what this merge relied on, even if an older one was there.
+    try {
+      saveReview(store.repo, review);
+    } catch {}
     // A verified merge is finished history; only started/uncertain intents block a new merge.
     data.merge_history = [...(data.merge_history ?? []), intent];
     delete data.merge_intent;
     data.evidence.push(evidence);
     Object.assign(data, { end_state: 'merged', updated_at: now() });
     store.save(data);
-    return after;
+    // PRs stacked on the merged branch now point at a branch that is done; name each next step.
+    const headRef = evidence.pr?.headRefName as string | undefined;
+    const fromHere =
+      Boolean(evidence.pr?.headRepo) && evidence.pr.headRepo === evidence.pr.baseRepo;
+    const open = headRef && fromHere ? openPrs(store.repo, pr) : null;
+    const stacked =
+      headRef && open
+        ? open
+            .filter((item) => item.base === headRef)
+            .map((item) => ({
+              pr: item.number,
+              next: `retarget PR ${item.number} to ${prBase}, merge ${prBase} into its branch (no rebase or force-push), then review and check its new head before \`solo merge ${item.number}\``,
+              retarget: `gh api -X PATCH ${prApi(pr).repoPath}/pulls/${item.number} -f base=${prBase}`,
+            }))
+        : [];
+    return stacked.length ? { ...after, stacked_prs: stacked } : after;
   });
 }
 

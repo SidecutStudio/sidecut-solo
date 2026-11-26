@@ -7,7 +7,7 @@ A round is one fix pushed and checked. Stop after two rounds, or sooner when a s
 1. Read the failing job's log for the exact head, for example `gh run view RUN --log-failed`. A CI diagnostics skill or tool, if one is installed, can read runners and hosted minutes.
 2. Decide which kind of failure it is:
    - **Caused by this change:** a test, type, lint or build error in code the task touched. Fix it.
-   - **Flaky or infrastructure:** a timeout, network error, runner loss or exhausted minutes. Rerun the failed jobs once. If it fails again the same way, stop and report it.
+   - **Flaky or infrastructure:** a timeout, network error, runner loss or exhausted minutes. Rerun the failed job once per delivery, not once per round, counting reruns other sessions made. If it fails again, stop and report it.
    - **Pre-existing or unrelated:** it fails on the base branch too, or in code the task didn't touch. Stop and report it. Never fix it inside this change.
 3. Fix through solo-build-change within the task's scope. Reproduce the failure locally when you can, and never weaken an assertion, skip a test or change a check's configuration to get green.
 4. Commit, push through `solo push`, and confirm the PR head moved to the new commit.

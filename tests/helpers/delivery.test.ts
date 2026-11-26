@@ -902,3 +902,159 @@ describe('review fixes', () => {
     expect(JSON.parse(result.stdout).status).toBe('uncertain');
   });
 });
+
+describe('saved reviews and stacked PRs', () => {
+  const OPEN_LIST = 'repos/{owner}/{repo}/pulls?state=open&per_page=100';
+  const flags = ['--authorized', '--publication-effect', 'none', '--host-scope', 'allowed'];
+  const review = (repo: string, head: string, count = '0') =>
+    cli([
+      ...['--repo', repo, 'review', '--reviewed-head', head, '--reviewer', 'independent'],
+      ...['--review-notes', 'Read the diff and tests', '--blocking-findings', count],
+    ]);
+
+  test('merge uses the review saved for HEAD, and a merge leaves one behind', () => {
+    const { repo } = makeRepo();
+    const head = inventory(repo).head;
+    const saved = review(repo, head);
+    expect(saved.code).toBe(0);
+    expect(JSON.parse(saved.stdout).path).toContain(join('solo-reviews', `${head}.json`));
+    fakeGh(provider(head));
+    const merged = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(merged.stderr).not.toContain('Blocked');
+    expect(JSON.parse(merged.stdout).state).toBe('MERGED');
+
+    // An inline review that merges is saved too.
+    const other = makeRepo().repo;
+    const otherHead = inventory(other).head;
+    fakeGh(provider(otherHead));
+    const inline = cli([
+      ...['--repo', other, 'merge', '1', '--reviewed-head', otherHead, '--reviewer', 'user'],
+      ...['--review-notes', 'x', '--blocking-findings', '0', ...flags],
+    ]);
+    expect(inline.code).toBe(0);
+    const record = join(git(other, ['rev-parse', '--git-common-dir']), 'solo-reviews');
+    expect(
+      JSON.parse(readFileSync(join(other, record, `${otherHead}.json`), 'utf8')).reviewer,
+    ).toBe('user');
+  }, 30_000);
+
+  test('review refuses a short SHA, an unknown commit and missing notes', () => {
+    const { repo } = makeRepo();
+    const head = inventory(repo).head;
+    expect(review(repo, head.slice(0, 12)).stderr).toContain('full commit SHA');
+    expect(review(repo, 'f'.repeat(40)).stderr).toContain('not a commit');
+    expect(
+      cli([
+        ...['--repo', repo, 'review', '--reviewed-head', head, '--reviewer', 'independent'],
+        ...['--review-notes', '', '--blocking-findings', '0'],
+      ]).stderr,
+    ).toContain('needs notes');
+  });
+
+  test('commits after the reviewed head block the merge and are named', () => {
+    const { repo } = makeRepo();
+    const reviewed = inventory(repo).head;
+    expect(review(repo, reviewed).code).toBe(0);
+    commit(repo, 'pick.ts', 'fixed\n', 'logic fix after review');
+    const head = inventory(repo).head;
+    // The inline refusal reads the open PR twice before the merge run reads it again.
+    const rules = provider(head);
+    const open = { stdout: restPr(head) };
+    (rules[0] as Rule).replies.unshift(open, open);
+    const calls = fakeGh(rules);
+    // No review for HEAD: the saved one below it is named before the network is touched.
+    let result = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(result.stderr).toContain(`1 commit after the reviewed head ${reviewed.slice(0, 12)}`);
+    expect(calls()).toEqual([]);
+    // The same review given inline is refused with the same reason, not a generic one.
+    result = cli([
+      ...['--repo', repo, 'merge', '1', '--reviewed-head', reviewed, '--reviewer', 'independent'],
+      ...['--review-notes', 'x', '--blocking-findings', '0', ...flags],
+    ]);
+    expect(result.stderr).toContain('1 commit after the reviewed head');
+    expect(result.stderr).not.toContain('review does not cover current HEAD');
+    expect(calls().some((call) => call[1] === '--method')).toBe(false);
+    // Reviewing the new head clears it.
+    expect(review(repo, head).code).toBe(0);
+    result = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(result.code).toBe(0);
+  }, 30_000);
+
+  test("a review of a commit already on the base branch isn't named for a new branch", () => {
+    const { repo } = makeRepo();
+    writeFileSync(join(repo, 'solo-workflow.toml'), 'base_branch = "main"\n');
+    writeFileSync(join(repo, '.git/info/exclude'), 'solo-workflow.toml\n');
+    expect(review(repo, inventory(repo).head).code).toBe(0);
+    git(repo, ['switch', '-c', 'next']);
+    commit(repo, 'new.txt', 'new\n', 'a new change');
+    const result = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(result.stderr).toContain('needs a review');
+    expect(result.stderr).not.toContain('after the reviewed head');
+  });
+
+  test('a stacked PR waits for the one below it, and a merge names the PRs stacked on it', () => {
+    const { repo } = makeRepo();
+    writeFileSync(join(repo, 'solo-workflow.toml'), 'base_branch = "main"\n');
+    writeFileSync(join(repo, '.git/info/exclude'), 'solo-workflow.toml\n');
+    const head = inventory(repo).head;
+    expect(review(repo, head).code).toBe(0);
+    const here = { full_name: 'o/r' };
+    const fork = { full_name: 'someone/r' };
+    const side = (ref: string, repo = here) => ({ ref, repo });
+    const pr = (base: string, merged = false) => ({
+      ...restPr(head, merged),
+      head: { sha: head, ...side('step-2') },
+      base: side(base),
+    });
+    const open = (number: number, headRef: string, base: string, repo = here) => ({
+      number,
+      head: side(headRef, repo),
+      base: side(base),
+    });
+    const list = [
+      open(1, 'step-1', 'main'),
+      open(2, 'step-2', 'step-1'),
+      open(3, 'step-3', 'step-2'),
+      open(4, 'release', 'main', fork),
+    ];
+    const rules = (base: string, pages = [list]) => [
+      { args: ['api', OPEN_LIST], replies: [{ stdout: pages }] },
+      {
+        args: ['api', PR],
+        replies: [{ stdout: pr(base) }, { stdout: pr(base) }, { stdout: pr(base, true) }],
+      },
+      ...provider(head).slice(1),
+    ];
+    let calls = fakeGh(rules('step-1'));
+    const refused = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(refused.stderr).toContain('is stacked on PR 1 (step-1): merge PR 1 first');
+    expect(calls().some((call) => call[1] === '--method')).toBe(false);
+
+    // A fork's branch named like this PR's base is not a PR below it.
+    fakeGh(rules('release', [[open(4, 'release', 'main', fork)]]));
+    expect(cli(['--repo', repo, 'merge', '1', ...flags]).stderr).not.toContain('stacked');
+
+    calls = fakeGh(rules('main'));
+    const merged = cli(['--repo', repo, 'merge', '1', ...flags]);
+    expect(merged.code).toBe(0);
+    const stacked = JSON.parse(merged.stdout).stacked_prs;
+    expect(stacked).toEqual([
+      expect.objectContaining({
+        pr: 3,
+        retarget: 'gh api -X PATCH repos/{owner}/{repo}/pulls/3 -f base=main',
+      }),
+    ]);
+  }, 30_000);
+
+  test('brief names the helper, the required checks and the follow-up rule', () => {
+    const { repo } = makeRepo();
+    writeFileSync(join(repo, 'solo-workflow.toml'), 'required_checks = ["gate", "e2e"]\n');
+    const out = cli(['--repo', repo, 'brief']);
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain(join('server', 'data', 'helper', 'solo'));
+    expect(out.stdout).toContain('gate, e2e');
+    expect(out.stdout).toContain('solo review --reviewed-head');
+    expect(out.stdout).toContain('follow-ups');
+    expect(out.stdout).toContain('--no-verify');
+  });
+});
