@@ -184,6 +184,10 @@ describe('merge guard hook', () => {
       `jq '.[] | select(.body | test("gh pr merge"))' prs.json`,
       "gh api repos/o/r/issues/5/comments -f body='OK\ngh pr merge 5 after review'",
       'gh search prs "gh pr merge"',
+      "git commit -F - <<'EOF'\nTitle\n\ngh pr merge is guarded\nEOF\n./scripts/after.sh",
+      "cat > notes.md <<'EOF'\ngh pr merge 5\nEOF\n./node_modules/.bin/prettier --write notes.md",
+      'npm test -- -t "gh pr merge"',
+      "npx vitest run tests/merge-guard.test.ts -t 'gh pr merge 5; gh pr merge 6'",
       "patch -p1 <<'EOF'\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n gh pr merge 5\nEOF",
       `node <<'EOF'\n${'f(a); g(b);\n'.repeat(2000)}// merge\nEOF`,
     ])
@@ -246,6 +250,16 @@ describe('merge guard hook', () => {
     'cd /tmp & gh pr merge 5 --admin',
     `${'a | '.repeat(15000)}gh pr merge 5 --admin`,
     Array.from({ length: 30000 }, () => '"a(b);c"').join(' ') + ' merge',
+    `perl -e 'system("x; gh pr merge 5 --admin")'`,
+    `awk 'BEGIN{system("x; gh pr merge 5 --admin")}'`,
+    `python3 -c 'import os; os.system("gh pr merge 5 --admin")'`,
+    `node -e "require('child_process').execSync('gh pr merge 5 --admin')"`,
+    "sed -n '1e gh pr merge 5 --admin' f",
+    `python3 - <<'EOF'\nimport os\nos.system("gh pr merge 5 --admin")\nEOF`,
+    '$HOME/bin/gh pr merge 5 --admin',
+    'echo "x; gh pr merge 5 --admin" 2>&1 | sh',
+    "printf 'gh pr merge 5\\n' > m.sh; sh ./m.sh",
+    'bin/gh pr merge 5 --admin',
   ];
   for (const command of hidden) {
     test(`sees the merge in: ${command.replace(/\n/g, ' / ')}`, async () => {

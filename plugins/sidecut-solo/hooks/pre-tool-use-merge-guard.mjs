@@ -108,7 +108,7 @@ function program(words) {
 /** A program's name: a path's last part (`/usr/bin/gh`, `./gh`), without a git alias's `!`. */
 const base = (word) => {
   const w = (word ?? '').replace(/^!(?=.)/, '');
-  return /^(\/|\.{1,2}\/|~\/)/.test(w) ? w.split('/').pop() : w;
+  return w.includes('/') ? w.split('/').pop() : w;
 };
 const SCRIPT_FLAG = /^-[A-Za-z]*c[A-Za-z]*$/;
 // What reads a script from its input: shells, and commands that hand it to one elsewhere.
@@ -118,17 +118,32 @@ const feedsShell = (words) => {
   const name = base(run[0]);
   return CONSUMERS.has(name) && !(SHELLS.has(name) && run.some((w) => SCRIPT_FLAG.test(w)));
 };
-/** Whether a command runs a script file, such as `bash m.sh`, `. ./env` or `./m.sh`. */
-const runsFile = (words) => {
+const plainPath = (path) => (path ?? '').replace(/^(\.\/)+/, '');
+/** The script file a command runs, such as `bash m.sh`, `. ./env` or `./m.sh`; '' when none. */
+const fileRun = (words) => {
   const run = program(words);
   const name = base(run[0]);
-  if (/^(\.{1,2}|~)?\//.test(run[0] ?? '') && !/^(gh|git)$/.test(name)) return true;
-  if (name === 'source' || name === '.') return run.length > 1;
-  return (
-    SHELLS.has(name) &&
-    !run.some((w) => SCRIPT_FLAG.test(w)) &&
-    run.slice(1).some((w) => !w.startsWith('-'))
-  );
+  if ((run[0] ?? '').includes('/') && !/^(gh|git)$/.test(name)) return plainPath(run[0]);
+  if (name === 'source' || name === '.') return plainPath(run[1]);
+  if (!SHELLS.has(name) || run.some((w) => SCRIPT_FLAG.test(w))) return '';
+  return plainPath(run.slice(1).find((w) => !w.startsWith('-')));
+};
+/** The files a command writes its text to: `> f`, `>> f`, `>f`, and tee's arguments. */
+const filesWritten = (words) => {
+  const run = program(words);
+  const out = [];
+  for (let k = 0; k < run.length; k++) {
+    const m = /^\d?>>?(.*)$/.exec(run[k]);
+    if (m) out.push(plainPath(m[1] || run[k + 1]));
+  }
+  if (base(run[0]) === 'tee')
+    out.push(
+      ...run
+        .slice(1)
+        .filter((w) => !w.startsWith('-'))
+        .map(plainPath),
+    );
+  return out.filter(Boolean);
 };
 
 // Options whose value is a message, not a script: git commit/tag/merge -m and gh's text options.
@@ -169,6 +184,14 @@ const PATTERNS = new Set([
   'deno',
   'bun',
 ]);
+// Code in those languages that starts a shell, so its text is read as a script after all.
+const SHELL_OUT =
+  /\bsystem\s*\(|\bexec(Sync|File|FileSync|vp?)?\s*\(|\bspawn(Sync)?\s*\(|subprocess|popen|`|\bqx\b|\bos\.exec|\bopen\s*\(\s*["']\|/;
+// sed's `e` command, alone or as an s///e flag, runs a shell.
+const SED_EXEC = /(^|[;{}\s\d$])e(\s|$)|\/e\b/;
+const TEST_RUNNERS = new Set(['npm', 'npx', 'pnpm', 'yarn', 'vitest', 'jest', 'bun', 'mocha']);
+const TEST_NAME = new Set(['-t', '--testNamePattern', '--grep', '-g']);
+const runsShell = (name, text) => SHELL_OUT.test(text) || (name === 'sed' && SED_EXEC.test(text));
 
 /** Whether word `q` of a command is message text rather than something a shell would run. */
 function isText(cmd, q, piped) {
@@ -176,7 +199,11 @@ function isText(cmd, q, piped) {
   const k = q - (cmd.words.length - run.length);
   if (k < 1) return false;
   const name = base(run[0]);
-  if (PATTERNS.has(name)) return true;
+  if (TEST_RUNNERS.has(name)) {
+    const before = run[k - 1] ?? '';
+    if (TEST_NAME.has(before) || /^--(testNamePattern|grep)=/.test(run[k])) return true;
+  }
+  if (PATTERNS.has(name)) return !runsShell(name, run[k]);
   if (name === 'echo' || name === 'printf') return !piped;
   const flags = name === 'git' ? GIT_TEXT : name === 'gh' ? GH_TEXT : null;
   if (!flags) return false;
@@ -190,9 +217,15 @@ function isText(cmd, q, piped) {
   );
 }
 
-/** A heredoc is a script only when a shell, or something that hands it to one, reads it. */
-function isTextHeredoc(cmd, piped) {
-  return !piped && !feedsShell(cmd.words);
+/**
+ * A heredoc is a script when a shell, or something that hands it to one, reads it; when code that
+ * shells out reads it; or when it is written to a file that a later command runs.
+ */
+function isTextHeredoc(cmd, body, piped, fileRun) {
+  const name = base(program(cmd.words)[0]);
+  if (piped || feedsShell(cmd.words)) return false;
+  if (PATTERNS.has(name) && runsShell(name, body)) return false;
+  return !fileRun;
 }
 
 /**
@@ -315,6 +348,10 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
       pending = [];
       continue;
     }
+    if (c === '&' && (text[i - 1] === '>' || text[i + 1] === '>')) {
+      word += c;
+      continue;
+    }
     if (c === '|' || c === '&') {
       const two = text[i + 1] === c;
       endCommand(two ? c + c : c);
@@ -344,7 +381,7 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
   endCommand(';');
   // Text written here may be run here: piped into a shell later in its pipeline, or written to a
   // file that a later command runs. Worked out backwards, once.
-  const fileRun = feeding || local.some((cmd) => runsFile(cmd.words));
+  const ran = new Set(local.map((cmd) => fileRun(cmd.words)).filter(Boolean));
   const pipedAt = new Array(local.length).fill(false);
   for (let n = local.length - 2; n >= 0; n--)
     pipedAt[n] = local[n].sep === '|' && (feedsShell(local[n + 1].words) || pipedAt[n + 1]);
@@ -353,16 +390,23 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
     // Bash runs each part of a pipeline, and a background job, in a subshell of its own.
     const own = cmd.sep === '|' || cmd.sep === '&' || local[n - 1]?.sep === '|';
     add({ words: cmd.words, scoped: scoped || cmd.subshell || own });
-    const piped = fileRun || pipedAt[n];
+    const piped = pipedAt[n];
+    const intoRun = feeding || filesWritten(cmd.words).some((f) => ran.has(f));
+    const written = piped || intoRun;
     for (const q of cmd.quoted) {
-      if (isText(cmd, q, piped)) continue;
+      if (isText(cmd, q, written)) continue;
       addAll(commands(cmd.words[q], depth + 1, true));
+      // sed's `e` command runs the rest of its line.
+      if (base(program(cmd.words)[0]) === 'sed')
+        for (const m of cmd.words[q].matchAll(/(?:^|[;{}\s\d$])e\s+([^\n;}]*)/g))
+          addAll(commands(m[1], depth + 1, true));
       // A git alias that runs a shell command: `alias.x=!gh ...`.
       const alias = /^[^=\s]+=!([\s\S]*)$/.exec(cmd.words[q]);
       if (alias) addAll(commands(alias[1], depth + 1, true));
     }
     for (const body of cmd.heredocs)
-      if (!isTextHeredoc(cmd, piped)) addAll(commands(body, depth + 1, true));
+      if (!isTextHeredoc(cmd, body, piped || feeding, intoRun))
+        addAll(commands(body, depth + 1, true));
     const run = program(cmd.words);
     if (base(run[0]) === 'eval') addAll(commands(run.slice(1).join(' '), depth + 1, true));
   }
@@ -517,7 +561,7 @@ try {
   if (!reason && unreadable && (soloRepo(start) || soloRepo(cwd)))
     reason = `Sidecut Solo refuses this command: it is nested too deeply or too long to check for a merge. Split it into simpler commands. ${helper}`;
 } catch {
-  if (soloRepo(start))
+  if (soloRepo(start) || soloRepo(cwd))
     reason = `Sidecut Solo refuses this command: it mentions a merge and couldn't be read to check it. Split it into simpler commands. ${helper}`;
 }
 if (reason)
