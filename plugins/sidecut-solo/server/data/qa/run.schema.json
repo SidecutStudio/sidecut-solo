@@ -35,7 +35,7 @@
       "enum": ["dogfood", "regression", "session"]
     },
     "skills": {
-      "description": "Each skill that ran, in order; a skill that ran twice appears twice. Required for session records.",
+      "description": "Each skill that ran, in order; a skill that ran twice appears twice. A session record lists at least one skill or one tool.",
       "type": "array",
       "items": {
         "type": "object",
@@ -60,6 +60,50 @@
           },
           "invocation": {
             "enum": ["explicit", "automatic", "unknown"]
+          },
+          "helped": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "description": "Optional. Each of the plugin's helper commands, MCP tools or hooks that ran without one of its skills, such as `solo qa-check` run by hand.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "helped", "skipped"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[-:][a-z0-9]+)*$",
+            "description": "<plugin>:<helper command, MCP tool or hook>, such as sidecut-solo:qa-check"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "helped": {
             "type": "array",
@@ -401,13 +445,26 @@
         }
       },
       "then": {
-        "required": ["skills"],
-        "properties": {
-          "skills": {
-            "type": "array",
-            "minItems": 1
+        "anyOf": [
+          {
+            "required": ["skills"],
+            "properties": {
+              "skills": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "required": ["tools"],
+            "properties": {
+              "tools": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
           }
-        },
+        ],
         "not": {
           "required": ["comparison"]
         }

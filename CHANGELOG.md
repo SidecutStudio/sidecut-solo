@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.40.5] - 2026-11-26
+
+### Fixed
+
+- A session record can list the plugin's helper commands, MCP tools or hooks that ran without one of its skills under `tools`, so a session that only ran `solo qa-check` or a hook no longer has to pass them off as skills. A session record still needs at least one skill or tool.
+
 ## [0.40.4] - 2026-11-26
 
 ### Fixed
