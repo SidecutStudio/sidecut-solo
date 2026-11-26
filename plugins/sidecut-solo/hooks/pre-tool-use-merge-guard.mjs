@@ -105,14 +105,30 @@ function program(words) {
   return words.slice(k);
 }
 
-const base = (word) => (word ?? '').split('/').pop();
-const isShell = (words) => {
+/** A program's name: a path's last part (`/usr/bin/gh`, `./gh`), without a git alias's `!`. */
+const base = (word) => {
+  const w = (word ?? '').replace(/^!(?=.)/, '');
+  return /^(\/|\.{1,2}\/|~\/)/.test(w) ? w.split('/').pop() : w;
+};
+const SCRIPT_FLAG = /^-[A-Za-z]*c[A-Za-z]*$/;
+// What reads a script from its input: shells, and commands that hand it to one elsewhere.
+const CONSUMERS = new Set([...SHELLS, 'ssh', 'docker', 'podman', 'kubectl', 'source', '.']);
+const feedsShell = (words) => {
   const run = program(words);
-  return SHELLS.has(base(run[0])) && !run.some((w) => /^-[A-Za-z]*c[A-Za-z]*$/.test(w));
+  const name = base(run[0]);
+  return CONSUMERS.has(name) && !(SHELLS.has(name) && run.some((w) => SCRIPT_FLAG.test(w)));
+};
+/** Whether a command runs a script file, such as `bash m.sh`, `. ./env` or `./m.sh`. */
+const runsFile = (words) => {
+  const run = program(words);
+  const name = base(run[0]);
+  if (/^(\.{1,2}|~)?\//.test(run[0] ?? '') && !/^(gh|git)$/.test(name)) return true;
+  if (name === 'source' || name === '.') return run.length > 1;
+  return SHELLS.has(name) && !run.some((w) => SCRIPT_FLAG.test(w)) && run.slice(1).some((w) => !w.startsWith('-'));
 };
 
 // Options whose value is a message, not a script: git commit/tag/merge -m and gh's text options.
-const GIT_TEXT = new Set(['-m', '--message', '-F', '--file']);
+const GIT_TEXT = new Set(['-m', '--message', '-F', '--file', '-S', '-G', '--grep']);
 const GH_TEXT = new Set([
   '-t',
   '--title',
@@ -125,8 +141,30 @@ const GH_TEXT = new Set([
   '--notes',
   '-m',
   '--message',
+  '-f',
+  '--raw-field',
+  '--field',
 ]);
-const PATTERNS = new Set(['grep', 'egrep', 'fgrep', 'rg', 'ag']);
+// Programs whose arguments are patterns or code in another language, never a shell script.
+const PATTERNS = new Set([
+  'grep',
+  'egrep',
+  'fgrep',
+  'rg',
+  'ag',
+  'sed',
+  'awk',
+  'gawk',
+  'perl',
+  'python',
+  'python3',
+  'node',
+  'ruby',
+  'jq',
+  'yq',
+  'deno',
+  'bun',
+]);
 
 /** Whether word `q` of a command is message text rather than something a shell would run. */
 function isText(cmd, q, piped) {
@@ -138,23 +176,26 @@ function isText(cmd, q, piped) {
   if (name === 'echo' || name === 'printf') return !piped;
   const flags = name === 'git' ? GIT_TEXT : name === 'gh' ? GH_TEXT : null;
   if (!flags) return false;
-  if (name === 'git' && run[1] === 'grep') return true;
+  if ((name === 'git' && run[1] === 'grep') || (name === 'gh' && run[1] === 'search')) return true;
   const word = run[k];
+  const before = run[k - 1] ?? '';
+  // git's short flags combine: -am, -sm, -qF all end in the message flag.
+  if (name === 'git' && /^-[A-Za-z]*[mF]$/.test(before)) return true;
   return (
-    flags.has(run[k - 1]) || [...flags].some((f) => f.startsWith('--') && word.startsWith(`${f}=`))
+    flags.has(before) || [...flags].some((f) => f.startsWith('--') && word.startsWith(`${f}=`))
   );
 }
 
-/** A heredoc is message text when git, gh or a file writer reads it and no shell does. */
+/** A heredoc is a script only when a shell, or something that hands it to one, reads it. */
 function isTextHeredoc(cmd, piped) {
-  return !piped && ['git', 'gh', 'cat', 'tee'].includes(base(program(cmd.words)[0]));
+  return !piped && !feedsShell(cmd.words);
 }
 
 /**
  * Simple commands in `text`, each { words, scoped }, in order. `scoped` marks commands inside a
  * subshell, a substitution or a nested script, whose `cd` never moves the outer shell.
  */
-function commands(text, depth = 0, scoped = false) {
+function commands(text, depth = 0, scoped = false, feeding = false) {
   const out = [];
   const add = (record) => {
     if (++produced > MAX_COMMANDS) unreadable = true;
@@ -231,6 +272,14 @@ function commands(text, depth = 0, scoped = false) {
       i = end;
       continue;
     }
+    if ((c === '<' || c === '>') && text[i + 1] === '(') {
+      // Process substitution: what it prints may be read as a script, so its text counts.
+      const end = closeParen(text, i, depth);
+      addAll(commands(text.slice(i + 2, end), depth + 1, true, true));
+      word += '/dev/fd';
+      i = end;
+      continue;
+    }
     if (c === '`') {
       const end = closeTick(text, i);
       substitute(text.slice(i + 1, end));
@@ -289,15 +338,26 @@ function commands(text, depth = 0, scoped = false) {
     word += c;
   }
   endCommand(';');
+  // Text written here may be run here: piped into a shell later in its pipeline, or written to a
+  // file that a later command runs. Worked out backwards, once.
+  const fileRun = feeding || local.some((cmd) => runsFile(cmd.words));
+  const pipedAt = new Array(local.length).fill(false);
+  for (let n = local.length - 2; n >= 0; n--)
+    pipedAt[n] =
+      local[n].sep === '|' && (feedsShell(local[n + 1].words) || pipedAt[n + 1]);
   for (let n = 0; n < local.length; n++) {
     const cmd = local[n];
-    add({ words: cmd.words, scoped: scoped || cmd.subshell });
-    // Piped into a shell somewhere later in the same pipeline.
-    let piped = false;
-    for (let m = n; m < local.length && local[m].sep === '|'; m++)
-      if (isShell(local[m + 1]?.words ?? [])) piped = true;
-    for (const q of cmd.quoted)
-      if (!isText(cmd, q, piped)) addAll(commands(cmd.words[q], depth + 1, true));
+    // Bash runs each part of a pipeline, and a background job, in a subshell of its own.
+    const own = cmd.sep === '|' || cmd.sep === '&' || local[n - 1]?.sep === '|';
+    add({ words: cmd.words, scoped: scoped || cmd.subshell || own });
+    const piped = fileRun || pipedAt[n];
+    for (const q of cmd.quoted) {
+      if (isText(cmd, q, piped)) continue;
+      addAll(commands(cmd.words[q], depth + 1, true));
+      // A git alias that runs a shell command: `alias.x=!gh ...`.
+      const alias = /^[^=\s]+=!([\s\S]*)$/.exec(cmd.words[q]);
+      if (alias) addAll(commands(alias[1], depth + 1, true));
+    }
     for (const body of cmd.heredocs)
       if (!isTextHeredoc(cmd, piped)) addAll(commands(body, depth + 1, true));
     const run = program(cmd.words);
@@ -371,6 +431,8 @@ try {
 const command = data?.tool_input?.command ?? data?.tool_input?.cmd ?? '';
 if (typeof command !== 'string' || !command.replace(/[\\'"]/g, '').includes('merge'))
   process.exit(0);
+// Past this size the reader could outlast the hook's timeout, which lets the call through.
+const MAX_LENGTH = 64 * 1024;
 
 let cwd = process.cwd();
 try {
@@ -425,7 +487,8 @@ const judge = (merge, dir) => {
 
 let reason = '';
 try {
-  for (const { words, scoped } of commands(command)) {
+  const found = command.length > MAX_LENGTH ? ((unreadable = true), []) : commands(command);
+  for (const { words, scoped } of found) {
     const w = program(words);
     if (w[0] === 'cd') {
       // A top-level `cd` decides which repo a later merge runs in. One this can't follow

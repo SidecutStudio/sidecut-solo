@@ -176,6 +176,16 @@ describe('merge guard hook', () => {
       "git commit -F - <<'EOF'\nTitle\n\ngh pr merge 42 --admin is refused\nEOF\ngit push",
       `gh pr create --body "$(cat <<'EOF'\ngh pr merge without a saved review\nEOF\n)"`,
       `gh pr merge 3 -t "title; with semicolon" --match-head-commit ${reviewed}`,
+      'git commit -am "Title\n\ngh pr merge is now guarded"',
+      "git log -S 'gh pr merge' --oneline",
+      "sed -i '' 's/gh pr merge --admin/x/' README.md",
+      `python3 -c 'print("x; gh pr merge 5")'`,
+      `node -e "console.log('gh pr merge 5')"`,
+      `jq '.[] | select(.body | test("gh pr merge"))' prs.json`,
+      "gh api repos/o/r/issues/5/comments -f body='OK\ngh pr merge 5 after review'",
+      'gh search prs "gh pr merge"',
+      "patch -p1 <<'EOF'\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n gh pr merge 5\nEOF",
+      `node <<'EOF'\n${'f(a); g(b);\n'.repeat(2000)}// merge\nEOF`,
     ])
       expect(await guard(command, solo)).toEqual(silent);
     // In double quotes a backtick runs its command, so the mention is a real merge.
@@ -225,6 +235,17 @@ describe('merge guard hook', () => {
     `${'"$('.repeat(41)}x${')"'.repeat(41)}; gh pr merge 5 --admin`,
     `${'$('.repeat(10)}${'eval '.repeat(10)}x${')'.repeat(10)}; gh pr merge 5 --admin`,
     `echo "$(${Array.from({ length: 30000 }, () => 'true').join('; ')})"; gh pr merge 5`,
+    "cat > /tmp/m.sh <<'EOF'\ngh pr merge 5 --admin\nEOF\nbash /tmp/m.sh",
+    'echo "x; gh pr merge 5 --admin" > /tmp/m.sh && sh /tmp/m.sh',
+    'cat <<EOF | ssh h\ngh pr merge 5 --admin\nEOF',
+    'echo "x; gh pr merge 5 --admin" | docker exec -i c sh',
+    'bash <(echo "x; gh pr merge 5 --admin")',
+    'source <(echo "x; gh pr merge 5")',
+    "git -c alias.x='!gh pr merge 5 --admin' x",
+    'cd /tmp | true; gh pr merge 5 --admin',
+    'cd /tmp & gh pr merge 5 --admin',
+    `${'a | '.repeat(15000)}gh pr merge 5 --admin`,
+    Array.from({ length: 30000 }, () => '"a(b);c"').join(' ') + ' merge',
   ];
   for (const command of hidden) {
     test(`sees the merge in: ${command.replace(/\n/g, ' / ')}`, async () => {
