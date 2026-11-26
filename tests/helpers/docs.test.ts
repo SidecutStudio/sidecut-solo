@@ -78,10 +78,25 @@ describe('docs-check', () => {
     git(repo, ['commit', '-m', 'add legacy']);
     git(repo, ['rm', '-rq', 'legacy']);
     git(repo, ['commit', '-m', 'remove legacy']);
-    write(repo, 'README.md', '# X\n\nSee `legacy/old.ts` and `elsewhere/thing.ts`.\n');
+    write(
+      repo,
+      'README.md',
+      [
+        '# X',
+        '',
+        'See `legacy/old.ts` and `elsewhere/thing.ts`.',
+        // Only the exact path that was here counts; a same-named folder may be another repo's.
+        'Edit `legacy/other.ts` in the shared repo.',
+        // A line telling the history is history, wherever the wording sits.
+        'We removed `legacy/` in v2.',
+        'History: `legacy/old.ts` was moved.',
+        '',
+      ].join('\n'),
+    );
     const result = check(repo);
-    // elsewhere/ never existed here, so it may name another repository's file.
-    expect(result.problems.map((p) => [p.kind, p.found])).toEqual([['path', 'legacy/old.ts']]);
+    expect(result.problems.map((p) => [p.line, p.kind, p.found])).toEqual([
+      [3, 'path', 'legacy/old.ts'],
+    ]);
   });
 
   test('leaves existing, ignored, other-repo and historical paths alone', () => {

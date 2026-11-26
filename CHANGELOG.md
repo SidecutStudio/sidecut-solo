@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- `solo docs-check` reported a backticked path into a top-level folder that a commit deleted. It had skipped any path whose first folder wasn't in the repo, so docs pointing into a removed or renamed folder passed.
+- `solo docs-check` reported a backticked path to a file or folder that a commit deleted from a top-level folder no longer in the repo. It had skipped any path whose first folder wasn't in the repo, so docs pointing into a removed folder passed. A same-named path that was never here, and a line that tells the history (removed, moved, renamed and the like), stay unreported.
 
 ## [0.40.1] - 2026-11-25
 

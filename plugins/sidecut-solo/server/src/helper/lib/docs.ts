@@ -190,23 +190,25 @@ export function docsCheck(repo: string, options: { oneSentencePerLine?: boolean 
     [, owner = '', self = ''] = /([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(url) ?? [];
   } catch {}
   const top = new Set(files.map((file) => file.split('/')[0] as string));
-  // Top-level folders Git history shows were deleted: a doc pointing into one is stale, not a
-  // pointer to another repository.
-  const removed = new Set(
-    gitRun(root, [
-      'log',
-      '--no-renames',
-      '--diff-filter=D',
-      '--format=',
-      '--name-only',
-      '-n',
-      '2000',
-    ])
-      .stdout.split('\n')
-      .filter((file) => file.includes('/'))
-      .map((file) => file.split('/')[0] as string)
-      .filter((first) => !top.has(first)),
-  );
+  // Files and folders Git history shows were deleted here. A doc naming one of them is stale, unless
+  // the line is telling that history. Matching the exact path keeps a same-named path from another
+  // repository out.
+  const deletedFiles = gitRun(root, [
+    'log',
+    '--no-renames',
+    '--diff-filter=D',
+    '--format=',
+    '--name-only',
+    '-n',
+    '2000',
+  ])
+    .stdout.split('\n')
+    .filter((file) => file.includes('/') && !known.has(file));
+  const deleted = new Set(deletedFiles);
+  for (const file of deletedFiles)
+    for (let at = file.indexOf('/'); at !== -1; at = file.indexOf('/', at + 1))
+      deleted.add(file.slice(0, at));
+
   const protectedPaths = load(root).config.protected_paths ?? [];
   const docs = files.filter(
     (file) =>
@@ -261,7 +263,11 @@ export function docsCheck(repo: string, options: { oneSentencePerLine?: boolean 
         const fromDoc = relative('.', join(here, token));
         const first = token.split('/')[0] as string;
         const relativeToDoc = token.startsWith('../') || (here !== '.' && exists(fromDoc));
-        if (!top.has(first) && !removed.has(first) && !relativeToDoc) continue;
+        const wasHere =
+          !top.has(first) &&
+          deleted.has(token.replace(/\/$/, '')) &&
+          !/\b(?:deleted|removed|retired|renamed|moved|gone|dropped|formerly|used to)\b/i.test(raw);
+        if (!top.has(first) && !wasHere && !relativeToDoc) continue;
         if (!token.includes('/') && !/\.\w+$/.test(token) && !dirs.has(token)) continue;
         const ok = /[*?{]/.test(token)
           ? matchesGlob(token) || matchesGlob(fromDoc)
