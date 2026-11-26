@@ -4,7 +4,7 @@ Free, offline regression tests for Sidecut Solo's helper and merge guard, from t
 
 - `probe.sh`: runs one probe on the plugin folder in `SOLO_PLUGIN` (default: this repo's `plugins/sidecut-solo`) and prints `exit=<status>`, the output, then what the remote holds. Its header lists every probe.
 - `helper.yaml`: every finding a probe can show, as a definition for the maintainer's eval runner (`evalbench`) with `before` and `after` command variants.
-- `fake-gh.mjs`: the scripted `gh` that `probe.sh` puts first on `PATH`.
+- `fake-gh.mjs`: the scripted `gh` that `probe.sh` and the helper tests' `fakeGh()` put first on `PATH`.
 
 `npm test` runs every probe on this checkout through `tests/helpers/probes.test.ts`, so CI does too: a `fixed` test must pass, and an `open` one must still fail until its fix lands.
 
