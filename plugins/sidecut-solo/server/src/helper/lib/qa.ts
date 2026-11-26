@@ -96,7 +96,7 @@ export function runProblems(scenario: Json, run: Json): string[] {
   if (run?.kind === 'session' && run.comparison)
     found.push('A session record is single-arm; a with/without pair needs dogfood runs');
   if (found.length) return found;
-  if (run.skills) {
+  if (run.skills?.length) {
     const used = [...new Set(run.skills.map((skill: Json) => skill.invocation))];
     const summary = used.length === 1 ? used[0] : 'mixed';
     if (run.invocation !== summary)

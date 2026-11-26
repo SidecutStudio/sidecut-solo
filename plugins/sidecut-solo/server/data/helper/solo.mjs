@@ -3875,7 +3875,7 @@ function runProblems(scenario, run2) {
   if (run2?.kind === "session" && run2.comparison)
     found.push("A session record is single-arm; a with/without pair needs dogfood runs");
   if (found.length) return found;
-  if (run2.skills) {
+  if (run2.skills?.length) {
     const used = [...new Set(run2.skills.map((skill) => skill.invocation))];
     const summary3 = used.length === 1 ? used[0] : "mixed";
     if (run2.invocation !== summary3)

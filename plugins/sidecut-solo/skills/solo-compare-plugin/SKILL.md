@@ -14,7 +14,7 @@ Record what a plugin actually contributed and limit conclusions to observed evid
 ## Steps
 
 1. Establish whether the request concerns one session, two plugin versions or plugin presence. Freeze outcome checks before controlled runs.
-2. Record skill activations from the transcript: name, installed version and explicit, automatic or unknown invocation. Include other plugins that materially contributed.
+2. Record skill activations from the transcript: name, installed version and explicit, automatic or unknown invocation. Include other plugins that materially contributed. List helper commands, MCP tools or hooks that ran without a skill under `tools`, never as skills.
 3. Treat optional usage exports as supporting evidence. A desktop slash command can appear proactive; the transcript decides how it started.
 4. Record each check's status, observation and evidence. Note helpful steps, unused guidance, user interventions, friction and all limitations.
 5. Use the installed templates under `server/data/qa`. Save one scenario and run record per tested plugin in the source repository's existing dogfood location.

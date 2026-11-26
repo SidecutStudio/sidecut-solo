@@ -175,11 +175,29 @@ describe('session records', () => {
     ]);
   });
 
-  test('a session must list its skills', () => {
+  test('a session must list a skill or a tool', () => {
     const [scenario, run] = session();
     run.skills = [];
     expect(runProblems(scenario, run).length).toBeGreaterThan(0);
     delete run.skills;
+    expect(runProblems(scenario, run).length).toBeGreaterThan(0);
+    run.tools = [];
+    expect(runProblems(scenario, run).length).toBeGreaterThan(0);
+  });
+
+  test('a session that ran only tools lists them without a skill', () => {
+    const [scenario, run] = session();
+    run.skills = [];
+    run.tools = [
+      {
+        name: 'sidecut-solo:qa-check',
+        version: null,
+        helped: ['Validated every record.'],
+        skipped: [],
+      },
+    ];
+    expect(runProblems(scenario, run)).toEqual([]);
+    run.tools[0].invocation = 'explicit';
     expect(runProblems(scenario, run).length).toBeGreaterThan(0);
   });
 
@@ -189,6 +207,8 @@ describe('session records', () => {
     expect(runProblems(scenario, run)).toContain(
       'A session record is single-arm; a with/without pair needs dogfood runs',
     );
+    const runSchema = JSON.parse(readFileSync(join(QA, 'run.schema.json'), 'utf8'));
+    expect(schemaErrors(runSchema, run).length).toBeGreaterThan(0);
   });
 
   test('the run invocation sums up its skills', () => {
