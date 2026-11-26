@@ -91,6 +91,7 @@ function program(words) {
   while (k < words.length) {
     const w = words[k];
     if (/^[A-Za-z_]\w*=/.test(w) || LEADS.has(w)) k++;
+    else if (/^\d*(<|>|&>)/.test(w)) k += /^\d*(<|>>?|&>)$/.test(w) ? 2 : 1;
     else if (WRAPPERS[w]) {
       const takes = WRAPPERS[w];
       for (
@@ -118,6 +119,8 @@ const feedsShell = (words) => {
   const name = base(run[0]);
   return CONSUMERS.has(name) && !(SHELLS.has(name) && run.some((w) => SCRIPT_FLAG.test(w)));
 };
+// Commands that write text to a file or stream, which a later command could run.
+const WRITERS = new Set(['cat', 'tee', 'echo', 'printf']);
 const plainPath = (path) => (path ?? '').replace(/^(\.\/)+/, '');
 /** The script file a command runs, such as `bash m.sh`, `. ./env` or `./m.sh`; '' when none. */
 const fileRun = (words) => {
@@ -126,24 +129,9 @@ const fileRun = (words) => {
   if ((run[0] ?? '').includes('/') && !/^(gh|git)$/.test(name)) return plainPath(run[0]);
   if (name === 'source' || name === '.') return plainPath(run[1]);
   if (!SHELLS.has(name) || run.some((w) => SCRIPT_FLAG.test(w))) return '';
+  const input = run.findIndex((w) => /^</.test(w));
+  if (input > 0) return plainPath(run[input].slice(1) || run[input + 1] || '<');
   return plainPath(run.slice(1).find((w) => !w.startsWith('-')));
-};
-/** The files a command writes its text to: `> f`, `>> f`, `>f`, and tee's arguments. */
-const filesWritten = (words) => {
-  const run = program(words);
-  const out = [];
-  for (let k = 0; k < run.length; k++) {
-    const m = /^\d?>>?(.*)$/.exec(run[k]);
-    if (m) out.push(plainPath(m[1] || run[k + 1]));
-  }
-  if (base(run[0]) === 'tee')
-    out.push(
-      ...run
-        .slice(1)
-        .filter((w) => !w.startsWith('-'))
-        .map(plainPath),
-    );
-  return out.filter(Boolean);
 };
 
 // Options whose value is a message, not a script: git commit/tag/merge -m and gh's text options.
@@ -381,7 +369,9 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
   endCommand(';');
   // Text written here may be run here: piped into a shell later in its pipeline, or written to a
   // file that a later command runs. Worked out backwards, once.
-  const ran = new Set(local.map((cmd) => fileRun(cmd.words)).filter(Boolean));
+  // Matching the written file to the run one by name misses `bash -o pipefail m.sh`, a `cd` or a
+  // copy in between, so any file run at this level counts.
+  const anyRun = local.some((cmd) => fileRun(cmd.words));
   const pipedAt = new Array(local.length).fill(false);
   for (let n = local.length - 2; n >= 0; n--)
     pipedAt[n] = local[n].sep === '|' && (feedsShell(local[n + 1].words) || pipedAt[n + 1]);
@@ -391,7 +381,8 @@ function commands(text, depth = 0, scoped = false, feeding = false) {
     const own = cmd.sep === '|' || cmd.sep === '&' || local[n - 1]?.sep === '|';
     add({ words: cmd.words, scoped: scoped || cmd.subshell || own });
     const piped = pipedAt[n];
-    const intoRun = feeding || filesWritten(cmd.words).some((f) => ran.has(f));
+    const writer = WRITERS.has(base(program(cmd.words)[0]));
+    const intoRun = feeding || (anyRun && writer);
     const written = piped || intoRun;
     for (const q of cmd.quoted) {
       if (isText(cmd, q, written)) continue;
@@ -446,6 +437,7 @@ function mergeOf(words) {
     let admin = false;
     const heads = [];
     for (let j = k + 1; j < w.length; j++) {
+      w[j] = w[j].replace(/\d*(&?>|<).*$/s, '') || w[j];
       const [flag, inline] = w[j].startsWith('--') ? w[j].split(/=(.*)/s, 2) : [w[j], undefined];
       if (flag === '--admin') admin = true;
       if (flag === '--match-head-commit') heads.push((inline ?? w[j + 1] ?? '').toLowerCase());
