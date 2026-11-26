@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.40.4] - 2026-11-26
+
+### Fixed
+
+- The `reviewer` and `refuter` agents can use WebFetch and WebSearch, so a finding that turns on a library, API or service's behavior is checked against its current docs and cited, or marked unverified. Before, they could only read the repository.
+
 ## [0.40.3] - 2026-11-26
 
 ### Changed
