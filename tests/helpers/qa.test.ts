@@ -207,6 +207,8 @@ describe('session records', () => {
     expect(runProblems(scenario, run)).toContain(
       'A session record is single-arm; a with/without pair needs dogfood runs',
     );
+    const runSchema = JSON.parse(readFileSync(join(QA, 'run.schema.json'), 'utf8'));
+    expect(schemaErrors(runSchema, run).length).toBeGreaterThan(0);
   });
 
   test('the run invocation sums up its skills', () => {

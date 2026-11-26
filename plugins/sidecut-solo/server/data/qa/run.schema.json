@@ -445,29 +445,35 @@
         }
       },
       "then": {
-        "anyOf": [
+        "allOf": [
           {
-            "required": ["skills"],
-            "properties": {
-              "skills": {
-                "type": "array",
-                "minItems": 1
+            "anyOf": [
+              {
+                "required": ["skills"],
+                "properties": {
+                  "skills": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "required": ["tools"],
+                "properties": {
+                  "tools": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
               }
-            }
+            ]
           },
           {
-            "required": ["tools"],
-            "properties": {
-              "tools": {
-                "type": "array",
-                "minItems": 1
-              }
+            "not": {
+              "required": ["comparison"]
             }
           }
-        ],
-        "not": {
-          "required": ["comparison"]
-        }
+        ]
       }
     },
     {
