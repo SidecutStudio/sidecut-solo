@@ -1,4 +1,12 @@
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // Disposable Git repos and a scripted `gh` for helper tests.
@@ -33,10 +41,21 @@ export function scratch(): string {
   return dir;
 }
 
+let template: string | undefined;
+
 /** A repo on main with one commit holding calc.py (a known-bad add) and valuable.txt. */
 export function makeRepo(): { repo: string; tmp: string } {
   const tmp = scratch();
   const repo = join(tmp, 'repo');
+  // Built once per test file, then copied: a copy costs no git runs.
+  cpSync(template ?? buildTemplate(), repo, { recursive: true, preserveTimestamps: true });
+  return { repo, tmp };
+}
+
+function buildTemplate(): string {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'solo-template-')));
+  process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+  const repo = join(dir, 'repo');
   mkdirSync(repo);
   git(repo, ['init', '-b', 'main']);
   git(repo, ['config', 'user.name', 'Fixture']);
@@ -47,7 +66,8 @@ export function makeRepo(): { repo: string; tmp: string } {
   writeFileSync(join(repo, 'valuable.txt'), 'original\n');
   git(repo, ['add', '.']);
   git(repo, ['commit', '-m', 'fixture base']);
-  return { repo, tmp };
+  template = repo;
+  return repo;
 }
 
 export function commit(repo: string, name: string, text: string, message: string): void {
@@ -70,7 +90,7 @@ export function fakeGh(rules: Rule[]): () => string[][] {
   writeFileSync(join(dir, 'rules.json'), JSON.stringify(rules));
   writeFileSync(
     join(bin, 'gh'),
-    `#!/bin/sh\nexec node ${JSON.stringify(join(import.meta.dirname, 'fake-gh.ts'))} ${JSON.stringify(dir)} "$@"\n`,
+    `#!/bin/sh\nexec node ${JSON.stringify(join(import.meta.dirname, '..', 'probes', 'fake-gh.mjs'))} ${JSON.stringify(dir)} "$@"\n`,
   );
   chmodSync(join(bin, 'gh'), 0o755);
   const previous = process.env.PATH;

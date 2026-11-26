@@ -4,7 +4,6 @@
     "plugins/sidecut-solo/server/src/helper/solo.ts",
     "scripts/*.ts",
     "tests/**/*.test.ts",
-    "tests/helpers/fake-gh.ts",
     "plugins/sidecut-solo/server/src/index.ts",
     "plugins/sidecut-solo/server/src/usage-view.ts",
     "plugins/sidecut-solo/server/data/examples/*.ts"

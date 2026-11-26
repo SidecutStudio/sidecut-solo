@@ -22,12 +22,13 @@ rest=${probe#*::}
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/solo-probe-XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
+# A git hook exports GIT_DIR and friends: drop every GIT_* so git acts on the probe's repo only.
+for key in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do unset "$key"; done
 # Nothing reaches the developer's own config, logs or GitHub login.
 export HOME="$tmp/home" SOLO_HELPER_LOG=off SIDECUT_SKILL_LOG=0 GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=Probe GIT_AUTHOR_EMAIL=probe@example.invalid
 export GIT_COMMITTER_NAME=Probe GIT_COMMITTER_EMAIL=probe@example.invalid
 mkdir -p "$HOME"
-for key in $(env | sed -n 's/^\(GIT_DIR\|GIT_WORK_TREE\|GIT_INDEX_FILE\)=.*/\1/p'); do unset "$key"; done
 
 g() { git -c commit.gpgsign=false -c core.hooksPath=/dev/null -c init.defaultBranch=main "$@"; }
 
