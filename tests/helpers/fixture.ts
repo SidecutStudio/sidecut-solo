@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // Disposable Git repos and a scripted `gh` for helper tests.
-import { afterEach } from 'vitest';
+import { afterAll, afterEach } from 'vitest';
 import { git } from '../../plugins/sidecut-solo/server/src/helper/lib/git.ts';
 import { runCommand } from '../process.ts';
 
@@ -42,6 +42,11 @@ export function scratch(): string {
 }
 
 let template: string | undefined;
+// A worker process outlives its test file, so the template goes when the file's tests finish.
+afterAll(() => {
+  if (template) rmSync(join(template, '..'), { recursive: true, force: true });
+  template = undefined;
+});
 
 /** A repo on main with one commit holding calc.py (a known-bad add) and valuable.txt. */
 export function makeRepo(): { repo: string; tmp: string } {
@@ -54,7 +59,6 @@ export function makeRepo(): { repo: string; tmp: string } {
 
 function buildTemplate(): string {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'solo-template-')));
-  process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
   const repo = join(dir, 'repo');
   mkdirSync(repo);
   git(repo, ['init', '-b', 'main']);
