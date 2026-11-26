@@ -3,16 +3,21 @@
 // unless it names the reviewed head and `solo review` saved a clean review of it. The helper's own
 // merge calls gh directly, not through the shell, so it never meets this hook.
 //
-// The command is split into simple commands the way a shell would, and every one of them is judged,
-// including what `$(...)`, backticks, `bash -c`, `eval` and a heredoc fed to a shell would run.
-// Single-quoted text, comments and other heredoc bodies, such as a commit message, are data.
+// The command is split into simple commands the way a shell would, and every one is judged. Quoted
+// words and heredoc bodies are read as scripts too, since `docker exec c bash -c '...'`, `ssh h
+// '...'` or `cat <<EOF | sh` run them; only the text arguments of message commands (a commit
+// message, a PR body, a grep pattern, echo not piped into a shell) are data. A command too deep or
+// too large to read, or one that breaks the reader, is refused in a Solo repo rather than let by.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh']);
+const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh', 'fish']);
 const MAX_DEPTH = 40;
+const MAX_COMMANDS = 20_000;
+let unreadable = false;
+let produced = 0;
 
 /** Where the `"` opened at `j` closes, skipping escapes and `$(...)` inside it. */
 function closeQuote(text, j, depth) {
@@ -26,7 +31,10 @@ function closeQuote(text, j, depth) {
 
 /** Where the `$(` opened at `i` closes, skipping quotes and escapes inside it. */
 function closeParen(text, i, depth = 0) {
-  if (depth > MAX_DEPTH) return text.length;
+  if (depth > MAX_DEPTH) {
+    unreadable = true;
+    return text.length;
+  }
   let level = 0;
   for (let j = i + 1; j < text.length; j++) {
     const c = text[j];
@@ -50,30 +58,139 @@ function closeTick(text, i) {
   return text.length;
 }
 
+const LEADS = new Set([
+  'then',
+  'do',
+  'else',
+  'if',
+  'while',
+  'until',
+  'time',
+  'command',
+  'exec',
+  '{',
+  '}',
+  '!',
+]);
+// Wrappers that run the rest of the line, and their options that take a value.
+const WRAPPERS = {
+  sudo: ['-u', '-g', '-C', '-D', '-h', '-p', '-U', '-r', '-t'],
+  doas: ['-u', '-C'],
+  xargs: ['-I', '-L', '-n', '-P', '-d', '-E', '-s', '-a'],
+  nohup: [],
+  nice: ['-n'],
+  caffeinate: ['-t', '-w'],
+  stdbuf: [],
+  env: ['-u', '-C', '-S'],
+  timeout: ['-s', '-k', '--signal', '--kill-after'],
+};
+
+/** The words after any assignments and wrappers such as `sudo -u x`, `timeout 60` or `env`. */
+function program(words) {
+  let k = 0;
+  while (k < words.length) {
+    const w = words[k];
+    if (/^[A-Za-z_]\w*=/.test(w) || LEADS.has(w)) k++;
+    else if (WRAPPERS[w]) {
+      const takes = WRAPPERS[w];
+      for (
+        k++;
+        k < words.length && (words[k].startsWith('-') || /^[A-Za-z_]\w*=/.test(words[k]));
+        k++
+      )
+        if (takes.includes(words[k])) k++;
+      if (w === 'timeout') k++; // its duration
+    } else break;
+  }
+  return words.slice(k);
+}
+
+const base = (word) => (word ?? '').split('/').pop();
+const isShell = (words) => {
+  const run = program(words);
+  return SHELLS.has(base(run[0])) && !run.some((w) => /^-[A-Za-z]*c[A-Za-z]*$/.test(w));
+};
+
+// Options whose value is a message, not a script: git commit/tag/merge -m and gh's text options.
+const GIT_TEXT = new Set(['-m', '--message', '-F', '--file']);
+const GH_TEXT = new Set([
+  '-t',
+  '--title',
+  '--subject',
+  '-b',
+  '--body',
+  '-F',
+  '--body-file',
+  '-n',
+  '--notes',
+  '-m',
+  '--message',
+]);
+const PATTERNS = new Set(['grep', 'egrep', 'fgrep', 'rg', 'ag']);
+
+/** Whether word `q` of a command is message text rather than something a shell would run. */
+function isText(cmd, q, piped) {
+  const run = program(cmd.words);
+  const k = q - (cmd.words.length - run.length);
+  if (k < 1) return false;
+  const name = base(run[0]);
+  if (PATTERNS.has(name)) return true;
+  if (name === 'echo' || name === 'printf') return !piped;
+  const flags = name === 'git' ? GIT_TEXT : name === 'gh' ? GH_TEXT : null;
+  if (!flags) return false;
+  if (name === 'git' && run[1] === 'grep') return true;
+  const word = run[k];
+  return (
+    flags.has(run[k - 1]) || [...flags].some((f) => f.startsWith('--') && word.startsWith(`${f}=`))
+  );
+}
+
+/** A heredoc is message text when git, gh or a file writer reads it and no shell does. */
+function isTextHeredoc(cmd, piped) {
+  return !piped && ['git', 'gh', 'cat', 'tee'].includes(base(program(cmd.words)[0]));
+}
+
 /**
- * Simple commands in `text`, each a list of words, in order, the way a shell would split them.
- * What a shell would run is included: `$(...)` and backticks (quoted or not), `bash -c`, `eval`
- * and heredocs fed to a shell. Single-quoted text, comments and other heredoc bodies are data.
+ * Simple commands in `text`, each { words, scoped }, in order. `scoped` marks commands inside a
+ * subshell, a substitution or a nested script, whose `cd` never moves the outer shell.
  */
-function commands(text, depth = 0) {
-  if (depth > MAX_DEPTH) return [];
+function commands(text, depth = 0, scoped = false) {
   const out = [];
-  let words = [];
+  const add = (record) => {
+    if (++produced > MAX_COMMANDS) unreadable = true;
+    else out.push(record);
+  };
+  const addAll = (records) => {
+    for (const record of records) add(record);
+  };
+  if (depth > MAX_DEPTH) {
+    unreadable = true;
+    return out;
+  }
+  const fresh = () => ({ words: [], quoted: new Set(), heredocs: [], sep: '', subshell: false });
+  const local = [];
+  let cur = fresh();
   let word = '';
   let quoted = false; // the current word had quotes, so an empty one still counts
-  let heredocs = [];
+  let parens = 0;
+  let pending = [];
   const endWord = () => {
-    if (word || quoted) words.push(word);
+    if (quoted) cur.quoted.add(cur.words.length);
+    if (word || quoted) cur.words.push(word);
     word = '';
     quoted = false;
   };
-  const endCommand = () => {
+  const endCommand = (sep) => {
     endWord();
-    if (words.length) out.push(words);
-    words = [];
+    if (cur.words.length) {
+      cur.sep = sep;
+      cur.subshell = parens > 0;
+      local.push(cur);
+    }
+    cur = fresh();
   };
   const substitute = (inner) => {
-    out.push(...commands(inner, depth + 1));
+    addAll(commands(inner, depth + 1, true));
     word += '$()';
   };
   for (let i = 0; i < text.length; i++) {
@@ -126,34 +243,43 @@ function commands(text, depth = 0) {
       continue;
     }
     if (c === '<' && text[i + 1] === '<' && text[i + 2] !== '<') {
-      // Heredoc: its body starts after this line and is data unless a shell reads it.
       const m = /^<<-?[ \t]*(['"]?)([A-Za-z_][\w-]*)\1/.exec(text.slice(i, i + 200));
       if (m) {
         endWord();
-        heredocs.push({ tag: m[2], owner: words });
+        pending.push({ tag: m[2], owner: cur });
         i += m[0].length - 1;
         continue;
       }
     }
     if (c === '\n') {
-      endCommand();
-      for (const { tag, owner } of heredocs) {
+      endCommand(';');
+      for (const { tag, owner } of pending) {
         const rest = text.slice(i + 1);
         const found = new RegExp(`^[ \\t]*${tag}[ \\t]*$`, 'm').exec(rest);
-        const body = found ? rest.slice(0, found.index) : rest;
-        const run = program(owner);
-        if (
-          SHELLS.has(run[0]?.split('/').pop()) &&
-          !run.some((w) => /^-[A-Za-z]*c[A-Za-z]*$/.test(w))
-        )
-          out.push(...commands(body, depth + 1));
+        owner.heredocs.push(found ? rest.slice(0, found.index) : rest);
         i = found ? i + 1 + found.index + found[0].length - 1 : text.length;
       }
-      heredocs = [];
+      pending = [];
       continue;
     }
-    if (c === ';' || c === '&' || c === '|' || c === '(' || c === ')') {
-      endCommand();
+    if (c === '|' || c === '&') {
+      const two = text[i + 1] === c;
+      endCommand(two ? c + c : c);
+      if (two) i++;
+      continue;
+    }
+    if (c === ';') {
+      endCommand(';');
+      continue;
+    }
+    if (c === '(') {
+      endCommand(';');
+      parens++;
+      continue;
+    }
+    if (c === ')') {
+      endCommand(';');
+      if (parens) parens--;
       continue;
     }
     if (c === ' ' || c === '\t') {
@@ -162,65 +288,22 @@ function commands(text, depth = 0) {
     }
     word += c;
   }
-  endCommand();
-  // What `bash -c '...'` and `eval ...` run, behind any wrapper such as sudo or timeout.
-  const nested = [];
-  for (const cmd of out) {
-    const run = program(cmd);
-    const name = run[0]?.split('/').pop();
-    if (name === 'eval') nested.push(...commands(run.slice(1).join(' '), depth + 1));
-    if (!SHELLS.has(name)) continue;
-    const flag = run.findIndex((w, k) => k > 0 && /^-[A-Za-z]*c[A-Za-z]*$/.test(w));
-    if (flag > 0 && run[flag + 1] !== undefined) nested.push(...commands(run[flag + 1], depth + 1));
+  endCommand(';');
+  for (let n = 0; n < local.length; n++) {
+    const cmd = local[n];
+    add({ words: cmd.words, scoped: scoped || cmd.subshell });
+    // Piped into a shell somewhere later in the same pipeline.
+    let piped = false;
+    for (let m = n; m < local.length && local[m].sep === '|'; m++)
+      if (isShell(local[m + 1]?.words ?? [])) piped = true;
+    for (const q of cmd.quoted)
+      if (!isText(cmd, q, piped)) addAll(commands(cmd.words[q], depth + 1, true));
+    for (const body of cmd.heredocs)
+      if (!isTextHeredoc(cmd, piped)) addAll(commands(body, depth + 1, true));
+    const run = program(cmd.words);
+    if (base(run[0]) === 'eval') addAll(commands(run.slice(1).join(' '), depth + 1, true));
   }
-  return [...out, ...nested];
-}
-
-const LEADS = new Set([
-  'then',
-  'do',
-  'else',
-  'if',
-  'while',
-  'until',
-  'time',
-  'command',
-  'exec',
-  '{',
-  '}',
-  '!',
-]);
-// Wrappers that run the rest of the line, and their options that take a value.
-const WRAPPERS = {
-  sudo: ['-u', '-g', '-C', '-D', '-h', '-p', '-U', '-r', '-t'],
-  xargs: ['-I', '-L', '-n', '-P', '-d', '-E', '-s', '-a'],
-  nohup: [],
-  nice: ['-n'],
-  caffeinate: ['-t', '-w'],
-  stdbuf: [],
-  doas: ['-u', '-C'],
-  env: ['-u', '-C', '-S'],
-  timeout: ['-s', '-k', '--signal', '--kill-after'],
-};
-
-/** The words after any assignments and wrappers such as `sudo -u x`, `timeout 60` or `env`. */
-function program(words) {
-  let k = 0;
-  while (k < words.length) {
-    const w = words[k];
-    if (/^[A-Za-z_]\w*=/.test(w) || LEADS.has(w)) k++;
-    else if (WRAPPERS[w]) {
-      const takes = WRAPPERS[w];
-      for (
-        k++;
-        k < words.length && (words[k].startsWith('-') || /^[A-Za-z_]\w*=/.test(words[k]));
-        k++
-      )
-        if (takes.includes(words[k])) k++;
-      if (w === 'timeout') k++; // its duration
-    } else break;
-  }
-  return words.slice(k);
+  return out;
 }
 
 /** gh's repo flag, which may stand before or after the subcommand. */
@@ -248,7 +331,7 @@ const PR_MERGE_VALUES = new Set([
 /** What kind of merge a command is, if any: { kind: 'pr', admin, heads } or { kind: 'api' }. */
 function mergeOf(words) {
   const w = program(words);
-  if (w[0]?.split('/').pop() !== 'gh') return null;
+  if (base(w[0]) !== 'gh') return null;
   let k = skipRepo(w, 1);
   if (w[k] === 'pr') {
     k = skipRepo(w, k + 1);
@@ -277,69 +360,77 @@ function mergeOf(words) {
   return null;
 }
 
-let input = '';
-for await (const chunk of process.stdin) input += chunk;
+let data;
 try {
-  const data = JSON.parse(input);
-  const command = data.tool_input?.command ?? data.tool_input?.cmd ?? '';
-  if (typeof command !== 'string' || !command.replace(/[\\'"]/g, '').includes('merge'))
-    process.exit(0);
+  let input = '';
+  for await (const chunk of process.stdin) input += chunk;
+  data = JSON.parse(input);
+} catch {
+  process.exit(0);
+}
+const command = data?.tool_input?.command ?? data?.tool_input?.cmd ?? '';
+if (typeof command !== 'string' || !command.replace(/[\\'"]/g, '').includes('merge'))
+  process.exit(0);
 
-  let cwd = process.cwd();
+let cwd = process.cwd();
+try {
+  if (typeof data.cwd === 'string' && statSync(data.cwd).isDirectory()) cwd = data.cwd;
+} catch {}
+const start = cwd;
+const gitOut = (dir, gitArgs) =>
+  execFileSync('git', ['-C', dir, ...gitArgs], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 1000,
+  }).trim();
+/** Whether `dir` is inside a repo with Solo settings. */
+const soloRepo = (dir) => {
   try {
-    if (typeof data.cwd === 'string' && statSync(data.cwd).isDirectory()) cwd = data.cwd;
+    return existsSync(join(gitOut(dir, ['rev-parse', '--show-toplevel']), 'solo-workflow.toml'));
+  } catch {
+    return false;
+  }
+};
+const helper =
+  'Merge with the Solo helper instead: `solo review --reviewed-head <sha> ...` for the head you reviewed, then `solo merge <pr>` (Deliver Change lists every step; `solo brief` prints them for a sub-agent).';
+
+/** Why this merge, run in `dir`, is refused; '' when it may run. */
+const judge = (merge, dir) => {
+  if (!soloRepo(dir)) return '';
+  if (merge.kind === 'api')
+    return `Sidecut Solo refuses a merge through \`gh api\` here: it skips the reviewed-head, check and permission gates. ${helper}`;
+  if (merge.admin)
+    return `Sidecut Solo refuses gh pr merge --admin: it asks GitHub to skip this repo's required checks and reviews. ${helper} If the user wants an admin merge, they run it themselves.`;
+  if (new Set(merge.heads).size > 1)
+    return `Sidecut Solo refuses this merge: it names more than one --match-head-commit. Give only the head you reviewed. ${helper}`;
+  const sha = merge.heads[0] ?? '';
+  if (!sha)
+    return `Sidecut Solo refuses gh pr merge without --match-head-commit <reviewed sha> here: the PR could merge a head nobody reviewed. ${helper}`;
+  if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha))
+    return `Sidecut Solo refuses this merge: give --match-head-commit the full SHA of the head you reviewed, not ${sha}. ${helper}`;
+  let record = null;
+  try {
+    const reviews = join(
+      gitOut(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+      'solo-reviews',
+    );
+    record = JSON.parse(readFileSync(join(reviews, `${sha}.json`), 'utf8'));
   } catch {}
-  const start = cwd;
-  const gitOut = (dir, gitArgs) =>
-    execFileSync('git', ['-C', dir, ...gitArgs], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1000,
-    }).trim();
-  const helper =
-    'Merge with the Solo helper instead: `solo review --reviewed-head <sha> ...` for the head you reviewed, then `solo merge <pr>` (Deliver Change lists every step; `solo brief` prints them for a sub-agent).';
+  if (!record || record.head !== sha)
+    return `Sidecut Solo refuses this merge: no saved review covers ${sha}. If it is the head you reviewed, run \`solo review --reviewed-head ${sha} ...\` first; if commits came after your review, review them. ${helper}`;
+  if (record.blocking_findings !== 0)
+    return `Sidecut Solo refuses this merge: the saved review of ${sha} has ${record.blocking_findings} unresolved blocking findings. Fix them and review the new head.`;
+  return '';
+};
 
-  /** Why this merge, run in `dir`, is refused; '' when it may run. */
-  const judge = (merge, dir) => {
-    let root;
-    try {
-      root = gitOut(dir, ['rev-parse', '--show-toplevel']);
-    } catch {
-      return '';
-    }
-    if (!existsSync(join(root, 'solo-workflow.toml'))) return '';
-    if (merge.kind === 'api')
-      return `Sidecut Solo refuses a merge through \`gh api\` here: it skips the reviewed-head, check and permission gates. ${helper}`;
-    if (merge.admin)
-      return `Sidecut Solo refuses gh pr merge --admin: it asks GitHub to skip this repo's required checks and reviews. ${helper} If the user wants an admin merge, they run it themselves.`;
-    if (new Set(merge.heads).size > 1)
-      return `Sidecut Solo refuses this merge: it names more than one --match-head-commit. Give only the head you reviewed. ${helper}`;
-    const sha = merge.heads[0] ?? '';
-    if (!sha)
-      return `Sidecut Solo refuses gh pr merge without --match-head-commit <reviewed sha> here: the PR could merge a head nobody reviewed. ${helper}`;
-    if (!/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(sha))
-      return `Sidecut Solo refuses this merge: give --match-head-commit the full SHA of the head you reviewed, not ${sha}. ${helper}`;
-    let record = null;
-    try {
-      const dir2 = join(
-        gitOut(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
-        'solo-reviews',
-      );
-      record = JSON.parse(readFileSync(join(dir2, `${sha}.json`), 'utf8'));
-    } catch {}
-    if (!record || record.head !== sha)
-      return `Sidecut Solo refuses this merge: no saved review covers ${sha}. If it is the head you reviewed, run \`solo review --reviewed-head ${sha} ...\` first; if commits came after your review, review them. ${helper}`;
-    if (record.blocking_findings !== 0)
-      return `Sidecut Solo refuses this merge: the saved review of ${sha} has ${record.blocking_findings} unresolved blocking findings. Fix them and review the new head.`;
-    return '';
-  };
-
-  let reason = '';
-  for (const words of commands(command)) {
+let reason = '';
+try {
+  for (const { words, scoped } of commands(command)) {
     const w = program(words);
     if (w[0] === 'cd') {
-      // A `cd` earlier in the same command decides which repo a later merge runs in. One this
-      // can't follow (`cd -`, a variable) falls back to the session's folder.
+      // A top-level `cd` decides which repo a later merge runs in. One this can't follow
+      // (`cd -`, a variable) falls back to the session's folder.
+      if (scoped) continue;
       const to = w[1] ?? '~';
       if (to.startsWith('-') || to.includes('$')) cwd = start;
       else {
@@ -355,14 +446,19 @@ try {
     reason = judge(merge, cwd);
     if (reason) break;
   }
-  if (!reason) process.exit(0);
+  if (!reason && unreadable && (soloRepo(start) || soloRepo(cwd)))
+    reason = `Sidecut Solo refuses this command: it is nested too deeply or too long to check for a merge. Split it into simpler commands. ${helper}`;
+} catch {
+  if (soloRepo(start))
+    reason = `Sidecut Solo refuses this command: it mentions a merge and couldn't be read to check it. Split it into simpler commands. ${helper}`;
+}
+if (reason)
   process.stdout.write(
-    JSON.stringify({
+    `${JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
         permissionDecisionReason: reason,
       },
-    }) + '\n',
+    })}\n`,
   );
-} catch {}

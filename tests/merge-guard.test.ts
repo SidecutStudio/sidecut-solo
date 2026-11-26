@@ -209,6 +209,22 @@ describe('merge guard hook', () => {
     'gh pr merge 5 --match-head-commit REVIEWED --match-head-commit ' + 'b'.repeat(40),
     'cd /tmp && cd - && gh pr merge 5',
     "gh pr mer''ge 5",
+    "docker exec c bash -c 'gh pr merge 5 --admin'",
+    "su -c 'gh pr merge 5 --admin' me",
+    "script -qc 'gh pr merge 5 --admin' /dev/null",
+    "flock /tmp/l -c 'gh pr merge 5 --admin'",
+    "fish -c 'gh pr merge 5 --admin'",
+    "ssh h 'cd r && gh pr merge 5 --admin'",
+    "watch -n1 'x; gh pr merge 5 --admin'",
+    "git rebase -x 'x; gh pr merge 5 --admin' main",
+    'echo "x; gh pr merge 5 --admin" | sh',
+    'cat <<EOF | bash\ngh pr merge 5 --admin\nEOF',
+    'cat <<EOF | tee log | bash\ngh pr merge 5\nEOF',
+    '(cd /tmp && ls) && gh pr merge 5 --admin',
+    'dir=$(cd /tmp && pwd); gh pr merge 5 --admin',
+    `${'"$('.repeat(41)}x${')"'.repeat(41)}; gh pr merge 5 --admin`,
+    `${'$('.repeat(10)}${'eval '.repeat(10)}x${')'.repeat(10)}; gh pr merge 5 --admin`,
+    `echo "$(${Array.from({ length: 30000 }, () => 'true').join('; ')})"; gh pr merge 5`,
   ];
   for (const command of hidden) {
     test(`sees the merge in: ${command.replace(/\n/g, ' / ')}`, async () => {
