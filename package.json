@@ -28,7 +28,7 @@
     "yaml": "2.9.1",
     "zod": "4.6.7"
   },
-  "version": "0.41.1",
+  "version": "0.41.2",
   "sidecut": {
     "keep": {
       "knip.json": "Knip's settings for the unused-code step in npm run check.",

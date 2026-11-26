@@ -160,7 +160,10 @@ const COMMANDS: Record<string, Spec> = {
         about:
           'review JSON file; or give the review inline with the next four; without either, the review saved for HEAD',
       },
-      'reviewed-head': { kind: 'string', about: 'full SHA the review covered' },
+      'reviewed-head': {
+        kind: 'string',
+        about: 'full SHA the review covered; alone, uses the review `review` saved for it',
+      },
       reviewer: { kind: 'string', choices: ['same-agent', 'independent', 'user'] },
       'review-notes': { kind: 'string', about: 'what was reviewed and found' },
       'blocking-findings': {
@@ -378,7 +381,7 @@ function inlineReview(args: Parsed) {
 
 /**
  * The review a merge relies on: a JSON file, the same four fields given inline, or the review
- * `solo review` saved for HEAD.
+ * `solo review` saved for `--reviewed-head` alone or, with no review flags, for HEAD.
  */
 function reviewFrom(args: Parsed, repo: string, base?: string): object {
   const inline = ['reviewed-head', 'reviewer', 'review-notes', 'blocking-findings'].filter(
@@ -388,6 +391,15 @@ function reviewFrom(args: Parsed, repo: string, base?: string): object {
     if (inline.length)
       throw new WorkflowError('merge: give --review or the inline review, not both');
     return json(args.review as string) as object;
+  }
+  // --reviewed-head alone names the commit whose saved review the merge relies on.
+  if (inline.length === 1 && inline[0] === 'reviewed-head') {
+    const named = args['reviewed-head'] as string;
+    const saved = loadReview(repo, named);
+    if (saved) return saved;
+    throw new WorkflowError(
+      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`,
+    );
   }
   if (inline.length) return inlineReview(args);
   const head = inventory(repo).head;

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.41.2] - 2026-11-26
+
+### Fixed
+
+- `solo merge --reviewed-head SHA` with no other review flags uses the review `solo review` saved for that commit, instead of asking for all four review fields again.
+
 ## [0.41.1] - 2026-11-26
 
 ### Changed

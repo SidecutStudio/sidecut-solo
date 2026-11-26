@@ -52,7 +52,7 @@ Record the exact head, reviewer kind, blocking finding count and review notes.
 
 Save it with solo review --reviewed-head SHA --reviewer SAME_AGENT|INDEPENDENT|USER --review-notes TEXT --blocking-findings NUMBER. solo merge then reads it for the head, and the merge guard accepts gh pr merge --match-head-commit SHA only for a head with a clean saved review.
 
-The same four flags can also go on solo merge.
+The same four flags can also go on solo merge, or --reviewed-head SHA alone to use the review saved for that commit.
 
 Alternatively pass --review FILE containing head, reviewer, blocking_findings and notes.
 

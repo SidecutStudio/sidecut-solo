@@ -938,6 +938,19 @@ describe('saved reviews and stacked PRs', () => {
     ).toBe('user');
   }, 30_000);
 
+  test('--reviewed-head alone uses the review saved for that commit', () => {
+    const { repo } = makeRepo();
+    const head = inventory(repo).head;
+    const calls = fakeGh(provider(head));
+    const merge = ['--repo', repo, 'merge', '1', '--reviewed-head', head, ...flags];
+    expect(cli(merge).stderr).toContain(`no review is saved for ${head}`);
+    expect(calls()).toEqual([]);
+    expect(review(repo, head).code).toBe(0);
+    const merged = cli(merge);
+    expect(merged.stderr).not.toContain('Blocked');
+    expect(JSON.parse(merged.stdout).state).toBe('MERGED');
+  }, 30_000);
+
   test('review refuses a short SHA, an unknown commit and missing notes', () => {
     const { repo } = makeRepo();
     const head = inventory(repo).head;
