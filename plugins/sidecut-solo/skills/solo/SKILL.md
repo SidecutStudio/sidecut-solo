@@ -2,6 +2,8 @@
 name: solo
 description: "Coordinates project work through the appropriate Solo skills. Use when the user wants an outcome spanning diagnosis, implementation, verification or delivery, or a hands-off run. Not for platform administration outside the project."
 argument-hint: "[desired outcome]"
+allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" brief *)
 ---
 
 # Sidecut Solo

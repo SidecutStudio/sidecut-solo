@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { cli } from './helpers/fixture.ts';
 import { PLUGIN } from './package-rules.ts';
 
 const HOOK = join(PLUGIN, 'hooks', 'pre-tool-use-merge-guard.mjs');
@@ -11,6 +12,8 @@ const HOOK = join(PLUGIN, 'hooks', 'pre-tool-use-merge-guard.mjs');
 let dir = '';
 let solo = '';
 let other = '';
+let reviewed = '';
+let blocked = '';
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'solo-guard-'));
@@ -21,6 +24,20 @@ beforeAll(async () => {
     execFileSync('git', ['-C', repo, 'init', '-q']);
   }
   await writeFile(join(solo, 'solo-workflow.toml'), 'merge = "when-green"\n');
+  const commit = (message: string) => {
+    const identity = ['-c', 'user.name=F', '-c', 'user.email=f@example.invalid'];
+    execFileSync('git', ['-C', solo, ...identity, 'commit', '-q', '--allow-empty', '-m', message]);
+    return execFileSync('git', ['-C', solo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  };
+  reviewed = commit('reviewed');
+  blocked = commit('reviewed with a blocker');
+  const review = (head: string, count: string) =>
+    cli([
+      ...['--repo', solo, 'review', '--reviewed-head', head, '--reviewer', 'independent'],
+      ...['--review-notes', 'Read the diff', '--blocking-findings', count],
+    ]);
+  expect(review(reviewed, '0').code).toBe(0);
+  expect(review(blocked, '2').code).toBe(0);
 });
 afterAll(() => rm(dir, { recursive: true, force: true }));
 
@@ -83,14 +100,60 @@ describe('merge guard hook', () => {
     });
   }
 
-  // Never a prompt, even in Bypass permissions mode: GitHub's required-checks ruleset decides.
-  const allows = [
+  // A merge outside the helper must name a head with a saved review: agents that merged with raw
+  // gh left no review behind.
+  const outside = [
     'gh pr merge 42 --squash',
     'gh pr merge --auto --squash',
-    'gh pr merge 42 --squash --match-head-commit abc123',
     'git add -A && git commit -qm "Name it" && git push -u origin b 2>&1 | tail -2\ngh pr create --title t --body b\ngh pr merge --auto --squash',
+    'gh -R o/r pr merge 42',
+    'cd nested && gh pr merge 42 --squash',
+    'gh pr merge 42 --squash --admin-notes',
+    'gh pr merge 42 --squash --match-head-commit abc1234',
     'gh api -X PUT repos/o/r/pulls/42/merge -f merge_method=squash',
+    'gh api --method=PUT repos/{owner}/{repo}/pulls/42/merge',
+    "gh api graphql -f query='mutation { mergePullRequest(input: {}) { clientMutationId } }'",
+  ];
+  for (const command of outside) {
+    test(`refuses a merge without a saved review: ${command}`, async () => {
+      const { out } = await guard(command, solo);
+      expect(decision(out)).toBe('deny');
+      expect(JSON.parse(out).hookSpecificOutput.permissionDecisionReason).toContain('solo merge');
+    });
+  }
+
+  test('allows gh pr merge at a head with a clean saved review, full or short', async () => {
+    for (const sha of [reviewed, reviewed.slice(0, 12)]) {
+      for (const command of [
+        `gh pr merge 42 --squash --match-head-commit ${sha}`,
+        `gh pr merge 42 --auto --match-head-commit=${sha}`,
+      ])
+        expect(await guard(command, solo)).toEqual({ code: 0, out: '' });
+    }
+  });
+
+  test('refuses a saved review that still has blocking findings', async () => {
+    const { out } = await guard(`gh pr merge 42 --match-head-commit ${blocked}`, solo);
+    expect(decision(out)).toBe('deny');
+    expect(out).toContain('2 unresolved blocking findings');
+  });
+
+  test('an admin merge stays refused at a reviewed head', async () => {
+    const { out } = await guard(`gh pr merge 42 --admin --match-head-commit ${reviewed}`, solo);
+    expect(decision(out)).toBe('deny');
+    expect(out).toContain('--admin');
+  });
+
+  test('a cd earlier in the command decides which repo is judged', async () => {
+    const silent = { code: 0, out: '' };
+    expect(await guard(`cd ${other} && gh pr merge 42 --squash`, solo)).toEqual(silent);
+    expect(decision((await guard(`cd ${solo} && gh pr merge 42`, other)).out)).toBe('deny');
+  });
+
+  // Never a prompt, even in Bypass permissions mode.
+  const allows = [
     "gh api graphql -f query='mutation { enablePullRequestAutoMerge(input: {}) { clientMutationId } }'",
+    'gh api repos/o/r/pulls/42/merge',
     'node plugins/sidecut-solo/server/data/helper/solo.mjs --task t merge',
     'gh pr view 42',
     'git merge main',
@@ -98,7 +161,6 @@ describe('merge guard hook', () => {
     "git commit -m 'never gh pr merge --admin'",
     'gh pr create --body "Never gh pr merge --admin"',
     "bash -c 'echo gh pr merge 1 --admin'",
-    'gh pr merge 42 --squash --admin-notes',
   ];
   for (const command of allows) {
     test(`stays silent for: ${command}`, async () => {

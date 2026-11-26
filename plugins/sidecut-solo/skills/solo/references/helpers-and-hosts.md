@@ -88,6 +88,6 @@ Without delegation, do a separate careful pass and label it same-agent. If a wor
 
 ## Hooks
 
-The merge guard refuses admin merges where Solo settings exist. Never rely on hooks as the merge boundary or merge with an admin override yourself.
+Where Solo settings exist, the merge guard refuses admin merges and any merge outside the helper that doesn't name a head with a clean saved review. Never rely on hooks as the merge boundary or merge with an admin override yourself.
 
 Check each host's active hook configuration and trust state. Installed files alone do not prove a hook ran.

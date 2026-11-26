@@ -50,7 +50,9 @@ Reuse permission throughout the task. Ask only when a prepared result still lack
 
 Record the exact head, reviewer kind, blocking finding count and review notes.
 
-Use --reviewed-head SHA --reviewer SAME_AGENT|INDEPENDENT|USER --review-notes TEXT --blocking-findings NUMBER.
+Save it with solo review --reviewed-head SHA --reviewer SAME_AGENT|INDEPENDENT|USER --review-notes TEXT --blocking-findings NUMBER. solo merge then reads it for the head, and the merge guard accepts gh pr merge --match-head-commit SHA only for a head with a clean saved review.
+
+The same four flags can also go on solo merge.
 
 Alternatively pass --review FILE containing head, reviewer, blocking_findings and notes.
 
@@ -85,6 +87,16 @@ Run checks --reviewed-head immediately before triggering it. Report the handoff 
 Continue following the requested outcome without repeated idle polling.
 
 Recheck the reviewed head after confirmation. Any new push needs fresh review and checks, and may require removing the trigger.
+
+## Stacked PRs
+
+Merge a stack bottom up, one PR at a time. solo merge refuses a PR whose base is another open PR's branch, and after a merge lists the PRs stacked on it with the retarget command.
+
+1. Commit or set aside your own uncommitted edits first; never merge or check out over them.
+2. Retarget the next PR to the base branch with the listed command.
+3. Merge the base branch into its branch. Never rebase and force-push a shared branch.
+4. Review the new head and save it with solo review. A merge of the base without conflicts needs only a check that it changed nothing else; a resolved conflict needs a real review.
+5. Wait for its required checks on that head, then solo merge it.
 
 ## Confirm outputs
 

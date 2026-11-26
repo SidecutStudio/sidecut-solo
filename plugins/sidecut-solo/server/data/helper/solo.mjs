@@ -1,8 +1,8 @@
 import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
 
 // plugins/sidecut-solo/server/src/helper/solo.ts
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join12 } from "node:path";
+import { readFileSync as readFileSync11, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join13 } from "node:path";
 import { cwd } from "node:process";
 
 // plugins/sidecut-solo/server/src/helper/dashboard/page.ts
@@ -2273,8 +2273,8 @@ function resolveAuthorization(mergePolicy, input) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/delivery.ts
-import { existsSync as existsSync7, lstatSync as lstatSync4, realpathSync as realpathSync4, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join7, resolve as resolve4 } from "node:path";
+import { existsSync as existsSync8, lstatSync as lstatSync4, realpathSync as realpathSync4, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join8, resolve as resolve4 } from "node:path";
 
 // plugins/sidecut-solo/server/src/helper/lib/present.ts
 function safeText(value) {
@@ -2335,6 +2335,10 @@ function textReport(data) {
   return `${lines.join("\n")}
 `;
 }
+
+// plugins/sidecut-solo/server/src/helper/lib/reviews.ts
+import { existsSync as existsSync7, readdirSync as readdirSync5, readFileSync as readFileSync6 } from "node:fs";
+import { join as join7 } from "node:path";
 
 // plugins/sidecut-solo/server/src/helper/lib/state.ts
 import { createHash as createHash2, randomBytes } from "node:crypto";
@@ -2672,8 +2676,78 @@ function shellQuote(value) {
   return /^[\w./=:@-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-// plugins/sidecut-solo/server/src/helper/lib/delivery.ts
+// plugins/sidecut-solo/server/src/helper/lib/reviews.ts
 var REVIEWERS = ["same-agent", "independent", "user"];
+var FULL_SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
+function reviewProblems(review) {
+  const reasons = [];
+  if (!REVIEWERS.includes(review.reviewer ?? "")) {
+    reasons.push("review must disclose reviewer as same-agent, independent or user");
+  }
+  const found = review.blocking_findings;
+  if (typeof found !== "number" || !Number.isInteger(found) || found < 0)
+    reasons.push(
+      "review must state its blocking findings as a whole number (--blocking-findings <n>)"
+    );
+  else if (found) reasons.push(`review has ${found} unresolved blocking findings`);
+  if (!review.notes) reasons.push("review file needs notes on what was reviewed");
+  return reasons;
+}
+function reviewDir(repo) {
+  return join7(commonDir(repo), "solo-reviews");
+}
+function saveReview(repo, review) {
+  const head = review.head ?? "";
+  if (!FULL_SHA.test(head))
+    throw new WorkflowError("review: --reviewed-head must be the full commit SHA you reviewed");
+  if (gitRun(repo, ["cat-file", "-e", `${head}^{commit}`]).code)
+    throw new WorkflowError(`review: ${head} is not a commit in this repository; fetch it first`);
+  const problems2 = reviewProblems(review).filter((reason) => !/unresolved blocking/.test(reason));
+  if (problems2.length) throw new WorkflowError(`review: ${problems2.join("; ")}`);
+  const record = {
+    head,
+    reviewer: review.reviewer,
+    blocking_findings: review.blocking_findings,
+    notes: review.notes,
+    at: now()
+  };
+  const path = join7(reviewDir(repo), `${head}.json`);
+  atomicJson(path, record);
+  return { path, review: record };
+}
+function loadReview(repo, head) {
+  if (!FULL_SHA.test(head)) return void 0;
+  const path = join7(reviewDir(repo), `${head}.json`);
+  if (!existsSync7(path)) return void 0;
+  try {
+    return JSON.parse(readFileSync6(path, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+function commitsAfter(repo, reviewed, head) {
+  if (!FULL_SHA.test(reviewed) || reviewed === head) return void 0;
+  if (gitRun(repo, ["merge-base", "--is-ancestor", reviewed, head]).code) return void 0;
+  const count2 = gitRun(repo, ["rev-list", "--count", `${reviewed}..${head}`]);
+  return count2.code ? void 0 : Number(count2.stdout.trim());
+}
+function lastReviewedBefore(repo, head) {
+  const dir = reviewDir(repo);
+  if (!existsSync7(dir)) return void 0;
+  let best;
+  for (const name of readdirSync5(dir)) {
+    const sha = name.replace(/\.json$/, "");
+    const after = commitsAfter(repo, sha, head);
+    if (after !== void 0 && (!best || after < best.after)) best = { head: sha, after };
+  }
+  return best;
+}
+function unreviewedCommits(reviewed, after, head) {
+  const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
+  return `${after} commit${after === 1 ? "" : "s"} after the reviewed head ${reviewed.slice(0, 12)} have no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
+}
+
+// plugins/sidecut-solo/server/src/helper/lib/delivery.ts
 var PROVEN = ["ancestor", "squash-merged", "content-in-target", "pr-merged"];
 var BUCKETS = {
   success: "pass",
@@ -2808,6 +2882,7 @@ function viewPr(repo, pr) {
     number: raw?.number,
     url: raw?.html_url,
     headRefOid: raw?.head?.sha,
+    headRefName: raw?.head?.ref,
     baseRefName: raw?.base?.ref,
     state: raw?.merged_at ? "MERGED" : String(raw?.state ?? "").toUpperCase(),
     mergeable: raw?.mergeable === true ? "MERGEABLE" : raw?.mergeable === false ? "CONFLICTING" : "UNKNOWN",
@@ -2929,26 +3004,22 @@ function gate(head, evidence, authorized, review, maxAgeSeconds = 300) {
   reasons.push(...reviewProblems(review));
   return { allowed: !reasons.length, reasons, head };
 }
-function reviewProblems(review) {
-  const reasons = [];
-  if (!REVIEWERS.includes(review.reviewer ?? "")) {
-    reasons.push("review must disclose reviewer as same-agent, independent or user");
+function openPrs(repo, pr) {
+  const api = prApi(pr);
+  try {
+    const listed = gh(repo, ["api", ...api.host, `${api.repoPath}/pulls?state=open&per_page=100`]);
+    if (!Array.isArray(listed)) return null;
+    return listed.filter((item) => item?.number && item.head?.ref && item.base?.ref).map((item) => ({ number: item.number, head: item.head.ref, base: item.base.ref }));
+  } catch {
+    return null;
   }
-  const found = review.blocking_findings;
-  if (typeof found !== "number" || !Number.isInteger(found) || found < 0)
-    reasons.push(
-      "review must state its blocking findings as a whole number (--blocking-findings <n>)"
-    );
-  else if (found) reasons.push(`review has ${found} unresolved blocking findings`);
-  if (!review.notes) reasons.push("review file needs notes on what was reviewed");
-  return reasons;
 }
 function headElsewhere(repo, pr, head, prHead) {
   const mismatch = `HEAD here is ${head.slice(0, 12)}, not PR ${pr}'s head ${prHead.slice(0, 12)}`;
   const there = worktrees(repo).find((tree) => tree.head === prHead && !tree.current);
   return there ? `${mismatch}; it is checked out in ${there.path}: run the merge from there (--repo ${JSON.stringify(there.path)})` : `${mismatch}; check out the PR head, or run from the worktree that has it (--repo <worktree>)`;
 }
-function merge(store, pr, authorized, review, method = "squash", require2 = [], problems2 = []) {
+function merge(store, pr, authorized, review, method = "squash", require2 = [], problems2 = [], baseBranch) {
   if (!MERGE_METHODS.includes(method)) {
     throw new WorkflowError("Merge method must be squash, merge or rebase");
   }
@@ -2997,7 +3068,23 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
     }
     if (evidence.head !== actual.head)
       reasons.push(headElsewhere(store.repo, pr, actual.head, evidence.head));
-    reasons.push(...gate(evidence.head, evidence, authorized, review).reasons);
+    const unreviewed = review.head ? commitsAfter(store.repo, review.head, evidence.head) : void 0;
+    const judged = gate(evidence.head, evidence, authorized, review).reasons;
+    reasons.push(
+      ...unreviewed === void 0 ? judged : [
+        unreviewedCommits(review.head, unreviewed, evidence.head),
+        ...judged.filter((reason) => reason !== "review does not cover current HEAD")
+      ]
+    );
+    const open = openPrs(store.repo, pr);
+    const prBase = evidence.pr?.baseRefName;
+    if (baseBranch && prBase && prBase !== baseBranch) {
+      const below = open?.find((item) => item.head === prBase);
+      if (below)
+        reasons.push(
+          `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${baseBranch} and review its new head`
+        );
+    }
     if (reasons.length) throw new WorkflowError(`Merge blocked: ${reasons.join("; ")}`);
     const intent = {
       pr,
@@ -3063,12 +3150,24 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
       );
     }
     Object.assign(intent, { status: "verified", after });
+    if (!loadReview(store.repo, actual.head)) {
+      try {
+        saveReview(store.repo, review);
+      } catch {
+      }
+    }
     data.merge_history = [...data.merge_history ?? [], intent];
     delete data.merge_intent;
     data.evidence.push(evidence);
     Object.assign(data, { end_state: "merged", updated_at: now() });
     store.save(data);
-    return after;
+    const headRef = evidence.pr?.headRefName;
+    const stacked = headRef && open ? open.filter((item) => item.base === headRef).map((item) => ({
+      pr: item.number,
+      next: `retarget PR ${item.number} to ${prBase}, merge ${prBase} into its branch (no rebase or force-push), then review and check its new head before \`solo merge ${item.number}\``,
+      retarget: `gh api -X PATCH ${prApi(pr).repoPath}/pulls/${item.number} -f base=${prBase}`
+    })) : [];
+    return stacked.length ? { ...after, stacked_prs: stacked } : after;
   });
 }
 var BRANCH_NAME = /^[A-Za-z0-9][\w./-]*$/;
@@ -3158,7 +3257,7 @@ ${detail}`);
 }
 function createWorktree(store, destination, ref) {
   const path = resolve4(destination);
-  if (existsSync7(path)) throw new WorkflowError("Task worktree destination must not exist");
+  if (existsSync8(path)) throw new WorkflowError("Task worktree destination must not exist");
   return store.writer(() => {
     const data = store.load();
     const oid = git(store.repo, ["rev-parse", "--verify", `${ref}^{commit}`]);
@@ -3174,7 +3273,7 @@ function createWorktree(store, destination, ref) {
     git(store.repo, ["worktree", "add", "--detach", path, oid]);
     record.path = realpathSync4(path);
     const admin = git(record.path, ["rev-parse", "--path-format=absolute", "--git-dir"]);
-    writeFileSync2(join7(admin, "solo-workflow-owner"), record.creation_token, "ascii");
+    writeFileSync2(join8(admin, "solo-workflow-owner"), record.creation_token, "ascii");
     record.status = "created";
     Object.assign(data, { snapshot: inventory(record.path), updated_at: now() });
     store.save(data);
@@ -3182,7 +3281,7 @@ function createWorktree(store, destination, ref) {
   });
 }
 function cleanupWorktree(store, destination, preservedRef) {
-  const path = existsSync7(destination) ? realpathSync4(destination) : resolve4(destination);
+  const path = existsSync8(destination) ? realpathSync4(destination) : resolve4(destination);
   return store.writer(() => {
     const data = store.load();
     const owned = data.owned_worktrees.find(
@@ -3214,7 +3313,7 @@ function cleanupWorktree(store, destination, preservedRef) {
     const slash = (item) => item.replaceAll("\\", "/");
     const spellings = new Set([path, resolve4(destination)].map(slash));
     const listed = listing.split("\n").map((line) => slash(line.replace(/^worktree /, "")));
-    if (existsSync7(path) || listed.some((item) => spellings.has(item))) {
+    if (existsSync8(path) || listed.some((item) => spellings.has(item))) {
       throw new WorkflowError("Cleanup postcondition failed");
     }
     if (git(store.repo, ["rev-parse", `${durableRef}^{commit}`]) !== target) {
@@ -3229,12 +3328,12 @@ function cleanupWorktree(store, destination, preservedRef) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/docs.ts
-import { existsSync as existsSync9, readdirSync as readdirSync6, readFileSync as readFileSync7, statSync as statSync2 } from "node:fs";
-import { dirname as dirname4, join as join9, normalize as normalize2, relative } from "node:path";
+import { existsSync as existsSync10, readdirSync as readdirSync7, readFileSync as readFileSync8, statSync as statSync2 } from "node:fs";
+import { dirname as dirname4, join as join10, normalize as normalize2, relative } from "node:path";
 
 // plugins/sidecut-solo/server/src/helper/lib/names.ts
-import { existsSync as existsSync8, readdirSync as readdirSync5, readFileSync as readFileSync6, statSync } from "node:fs";
-import { basename, join as join8 } from "node:path";
+import { existsSync as existsSync9, readdirSync as readdirSync6, readFileSync as readFileSync7, statSync } from "node:fs";
+import { basename, join as join9 } from "node:path";
 var BARE_SKILLS = {
   dogfood: "solo-compare-plugin",
   "improve-workflow": "solo-prevent-mistake",
@@ -3270,14 +3369,14 @@ var RETIRED_HELPERS = ["scripts/solo.ts"];
 var CURRENT_AFTER = /^(?:\.toml|\.local\.toml|:start|:end|-owner| marker|\/(?:TASK|<task>))/;
 var CURRENT_DIR = /(?:\.git\/|state\/|\)\/|_HOME\/|\$\{?[A-Z_]*STATE[A-Z_]*\}?\/)$/;
 function manifest() {
-  const data = JSON.parse(readFileSync6(join8(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
+  const data = JSON.parse(readFileSync7(join9(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
   const name = String(data.name);
   const repository = String(data.repository ?? "").replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
-  const skills = readdirSync5(join8(pluginRoot, "skills")).filter(
-    (entry) => existsSync8(join8(pluginRoot, "skills", entry, "SKILL.md"))
+  const skills = readdirSync6(join9(pluginRoot, "skills")).filter(
+    (entry) => existsSync9(join9(pluginRoot, "skills", entry, "SKILL.md"))
   );
-  const agentDir = join8(pluginRoot, "codex", "agents");
-  const agents = (existsSync8(agentDir) ? readdirSync5(agentDir) : []).filter((entry) => entry.endsWith(".toml")).map((entry) => entry.replace(/\.toml$/, ""));
+  const agentDir = join9(pluginRoot, "codex", "agents");
+  const agents = (existsSync9(agentDir) ? readdirSync6(agentDir) : []).filter((entry) => entry.endsWith(".toml")).map((entry) => entry.replace(/\.toml$/, ""));
   const owner = repository.split("/")[0] || "SidecutStudio";
   return {
     name,
@@ -3360,11 +3459,11 @@ function retiredNames(repo) {
   const files = candidates(root2);
   const findings = [];
   for (const file of files) {
-    const path = join8(root2, file);
+    const path = join9(root2, file);
     let text;
     try {
       if (!statSync(path).isFile() || statSync(path).size > 1e6) continue;
-      text = readFileSync6(path, "utf8");
+      text = readFileSync7(path, "utf8");
     } catch {
       continue;
     }
@@ -3392,13 +3491,13 @@ var NOT_DOCS = /^(?:CHANGELOG|LICENSE|NOTICE)[^/]*$/i;
 var ABBREVIATIONS = /\b(?:e\.g|i\.e|etc|vs|cf|approx|no|Mr|Ms|Dr|St)\.$/i;
 function listFiles(root2) {
   try {
-    return git(root2, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], false).split("\0").filter((path) => path && existsSync9(join9(root2, path)));
+    return git(root2, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], false).split("\0").filter((path) => path && existsSync10(join10(root2, path)));
   } catch {
     const found = [];
     const walk = (dir) => {
       let entries;
       try {
-        entries = readdirSync6(join9(root2, dir), { withFileTypes: true });
+        entries = readdirSync7(join10(root2, dir), { withFileTypes: true });
       } catch {
         return;
       }
@@ -3494,7 +3593,7 @@ function manifestScripts(root2, files) {
   for (const file of manifests) {
     try {
       for (const name of Object.keys(
-        JSON.parse(readFileSync7(join9(root2, file), "utf8")).scripts ?? {}
+        JSON.parse(readFileSync8(join10(root2, file), "utf8")).scripts ?? {}
       ))
         names.add(name);
     } catch {
@@ -3553,7 +3652,7 @@ function docsCheck(repo, options = {}) {
   const read = (file) => {
     if (!texts.has(file)) {
       try {
-        texts.set(file, readFileSync7(join9(root2, file), "utf8"));
+        texts.set(file, readFileSync8(join10(root2, file), "utf8"));
       } catch {
         texts.set(file, "");
       }
@@ -3561,7 +3660,7 @@ function docsCheck(repo, options = {}) {
     return texts.get(file);
   };
   for (const file of docs) {
-    const path = join9(root2, file);
+    const path = join10(root2, file);
     if (!statSync2(path).isFile() || statSync2(path).size > 1e6) continue;
     const text = read(file);
     const here = dirname4(file);
@@ -3575,7 +3674,7 @@ function docsCheck(repo, options = {}) {
         const token = span2.replace(/^\.\//, "").replace(/(?::\d+(?:-\d+)?|#.*)$/, "").replace(/[.,;:]$/, "");
         if (!token || /[<>$|=()@~\\]|:\/\/|^\//.test(token)) continue;
         if (token.split("/").some((part) => /^[A-Z][A-Z0-9_]+$/.test(part))) continue;
-        const fromDoc = relative(".", join9(here, token));
+        const fromDoc = relative(".", join10(here, token));
         const first = token.split("/")[0];
         const relativeToDoc = token.startsWith("../") || here !== "." && exists(fromDoc);
         const wasHere = !top.has(first) && deleted.has(token.replace(/\/$/, "")) && !/\b(?:deleted|removed|retired|renamed|moved|gone|dropped|formerly|used to)\b/i.test(raw);
@@ -3609,9 +3708,9 @@ function docsCheck(repo, options = {}) {
         } catch {
           linked = rawPath;
         }
-        const resolved = linked ? relative(".", linked.startsWith("/") ? `.${linked}` : join9(here, linked)) : file;
+        const resolved = linked ? relative(".", linked.startsWith("/") ? `.${linked}` : join10(here, linked)) : file;
         if (resolved.startsWith("..")) continue;
-        if (linked && !exists(resolved) && !existsSync9(join9(root2, resolved))) {
+        if (linked && !exists(resolved) && !existsSync10(join10(root2, resolved))) {
           problems2.push({
             file,
             line,
@@ -3797,9 +3896,9 @@ async function run(store, key, argv, timeout = 120) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/qa.ts
-import { readFileSync as readFileSync8 } from "node:fs";
-import { join as join10 } from "node:path";
-var SCHEMAS = join10(pluginRoot, "server", "data", "qa");
+import { readFileSync as readFileSync9 } from "node:fs";
+import { join as join11 } from "node:path";
+var SCHEMAS = join11(pluginRoot, "server", "data", "qa");
 function typeMatches(type, value) {
   if (type === "null") return value === null;
   if (type === "array") return Array.isArray(value);
@@ -3865,7 +3964,7 @@ function schemaErrors(schema2, value, at = "$") {
   return errors;
 }
 function schema(name) {
-  return JSON.parse(readFileSync8(join10(SCHEMAS, `${name}.schema.json`), "utf8"));
+  return JSON.parse(readFileSync9(join11(SCHEMAS, `${name}.schema.json`), "utf8"));
 }
 function runProblems(scenario, run2) {
   const found = [
@@ -3981,7 +4080,7 @@ function comparePair(withRun, withoutRun) {
   return lines;
 }
 function qaCommand(command, paths) {
-  const [scenario, ...runs] = paths.map((path) => JSON.parse(readFileSync8(path, "utf8")));
+  const [scenario, ...runs] = paths.map((path) => JSON.parse(readFileSync9(path, "utf8")));
   const [first, second] = runs;
   const compare = command === "qa-compare";
   const found = compare ? pairProblems(scenario, first, second) : runProblems(scenario, first);
@@ -3997,8 +4096,8 @@ function qaCommand(command, paths) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/surface.ts
-import { readFileSync as readFileSync9 } from "node:fs";
-import { join as join11 } from "node:path";
+import { readFileSync as readFileSync10 } from "node:fs";
+import { join as join12 } from "node:path";
 var NOT_SEEN = [
   /(^|\/)(tests?|__tests__|e2e|fixtures|__snapshots__|node_modules|\.github)\//i,
   /^(dist|build|out)\//,
@@ -4094,7 +4193,7 @@ function userFacing(dir, base, head, policy) {
     ];
     changed = changedLines(from) + untracked.reduce((sum, p) => {
       try {
-        return sum + readFileSync9(join11(repo, p), "utf8").split("\n").length;
+        return sum + readFileSync10(join12(repo, p), "utf8").split("\n").length;
       } catch {
         return sum;
       }
@@ -4189,12 +4288,28 @@ var COMMANDS = {
       ...AUTHORIZATION
     }
   },
+  review: {
+    help: "Save the review of one commit, which merge and the merge guard read",
+    options: {
+      "reviewed-head": { kind: "string", required: true, about: "full SHA the review covered" },
+      reviewer: { kind: "string", required: true, choices: ["same-agent", "independent", "user"] },
+      "review-notes": { kind: "string", required: true, about: "what was reviewed and found" },
+      "blocking-findings": {
+        kind: "string",
+        required: true,
+        about: "unresolved blocker or major findings"
+      }
+    }
+  },
+  brief: {
+    help: "Print the paragraph to paste into a sub-agent's brief so its delivery goes through this helper"
+  },
   merge: {
     help: "Merge the PR at the reviewed head once every requirement holds; starts a task record if there is none",
     options: {
       review: {
         kind: "string",
-        about: "review JSON file; or give the review inline with the next four"
+        about: "review JSON file; or give the review inline with the next four; without either, the review saved for HEAD"
       },
       "reviewed-head": { kind: "string", about: "full SHA the review covered" },
       reviewer: { kind: "string", choices: ["same-agent", "independent", "user"] },
@@ -4373,21 +4488,9 @@ function summary(data) {
   };
 }
 function json(path) {
-  return JSON.parse(readFileSync10(path, "utf8"));
+  return JSON.parse(readFileSync11(path, "utf8"));
 }
-function reviewFrom(args) {
-  const inline = ["reviewed-head", "reviewer", "review-notes", "blocking-findings"].filter(
-    (name) => args[name] !== void 0
-  );
-  if (args.review !== void 0) {
-    if (inline.length)
-      throw new WorkflowError("merge: give --review or the inline review, not both");
-    return json(args.review);
-  }
-  if (!inline.length)
-    throw new WorkflowError(
-      "merge: needs a review: --review <file>, or --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>"
-    );
+function inlineReview(args) {
   const count2 = args["blocking-findings"];
   const findings = count2 !== void 0 && /^none$/i.test(count2) ? 0 : count2 !== void 0 && /^\d+$/.test(count2) ? Number(count2) : void 0;
   return {
@@ -4397,9 +4500,40 @@ function reviewFrom(args) {
     blocking_findings: findings
   };
 }
+function reviewFrom(args, repo) {
+  const inline = ["reviewed-head", "reviewer", "review-notes", "blocking-findings"].filter(
+    (name) => args[name] !== void 0
+  );
+  if (args.review !== void 0) {
+    if (inline.length)
+      throw new WorkflowError("merge: give --review or the inline review, not both");
+    return json(args.review);
+  }
+  if (inline.length) return inlineReview(args);
+  const head = inventory(repo).head;
+  const saved = loadReview(repo, head);
+  if (saved) return saved;
+  const below = lastReviewedBefore(repo, head);
+  throw new WorkflowError(
+    below ? `merge: ${unreviewedCommits(below.head, below.after, head)}` : "merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>"
+  );
+}
+function brief(repo, settings) {
+  const solo = `sh ${JSON.stringify(join13(pluginRoot, "server", "data", "helper", "solo"))}`;
+  const checks = settings.required_checks?.length ? settings.required_checks.join(", ") : "the base branch's protection rules";
+  const policy = settings.merge ?? DEFAULTS.merge;
+  return [
+    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
+    `Push with \`solo push\`, then \`solo checks <pr> --reviewed-head <full sha>\`; every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
+    `Record the review of that head with \`solo review --reviewed-head <sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
+    "Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.",
+    `Repo: ${repo}`
+  ].join(" ");
+}
 var VERSION = (() => {
   try {
-    return json(join12(pluginRoot, ".codex-plugin", "plugin.json")).version ?? "?";
+    return json(join13(pluginRoot, ".codex-plugin", "plugin.json")).version ?? "?";
   } catch {
     return "?";
   }
@@ -4544,6 +4678,13 @@ Dashboard saved to ${args.html}`);
     case "retired-names":
       result = retiredNames(repo);
       break;
+    case "review":
+      result = saveReview(repo, inlineReview(args));
+      break;
+    case "brief":
+      process.stdout.write(`${brief(repo, settings)}
+`);
+      return 0;
     case "checks":
       result = collectChecks(
         repo,
@@ -4582,7 +4723,7 @@ Dashboard saved to ${args.html}`);
       } else if (command === "run") {
         result = await run(store, args.key, args.rest, Number(args.timeout ?? 120));
       } else if (command === "merge") {
-        const review = reviewFrom(args);
+        const review = reviewFrom(args, repo);
         const resolved = permission();
         if (resolved.merge_vetoed)
           throw new WorkflowError('repo settings set merge = "never"; configuration veto');
@@ -4617,7 +4758,8 @@ Dashboard saved to ${args.html}`);
           review,
           args.method ?? settings.merge_method ?? DEFAULTS.merge_method,
           required,
-          problems2
+          problems2,
+          settings.base_branch
         );
       } else if (command === "worktree")
         result = createWorktree(store, positional(0), args.ref ?? "HEAD");
@@ -4647,7 +4789,7 @@ if (import.meta.main) {
     console.error(`Blocked: ${message}`);
     if (name === "merge")
       console.error(
-        `Merges follow Deliver Change, which lists every requirement: read ${join12(pluginRoot, "skills", "solo-deliver-change", "SKILL.md")}`
+        `Merges follow Deliver Change, which lists every requirement: read ${join13(pluginRoot, "skills", "solo-deliver-change", "SKILL.md")}`
       );
     process.exit(2);
   }

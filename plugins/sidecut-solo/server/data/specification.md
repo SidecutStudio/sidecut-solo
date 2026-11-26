@@ -97,7 +97,7 @@ The usage tool provides an MCP App dashboard where supported. Terminal clients r
 
 Separate Claude Code and Codex hook files register the same installed scripts with each host's event names, and root `hooks.json` registers the skill-log hook for Gemini/Antigravity. Codex requires user trust before running hooks.
 
-The merge guard rejects admin merges that would skip required checks in configured repositories. It reads command data rather than descriptions and does not enforce a sandbox boundary.
+The merge guard rejects admin merges in configured repositories, and any other merge run outside the helper unless it names a head with a clean saved review (`gh pr merge --match-head-commit SHA`). It reads command data rather than descriptions, follows a `cd` earlier in the same command, and does not enforce a sandbox boundary.
 
 A malformed or unavailable hook input fails open without becoming merge permission. Helper gates remain responsible for delivery checks and permission.
 
@@ -130,7 +130,8 @@ A hands-off task ([hands-off.md](hands-off.md)) takes the recommended option at 
 | config, inventory, remote-state, merged | Read effective policy and Git facts; only remote-state fetches. |
 | start, resume, checkpoint, reconcile, run | Preserve recoverable task state and track bounded command outcomes. |
 | user-facing | Identify visible changes, whether rendered design review is needed, and the suggested review level. |
-| push, checks, authorization, gate, merge | Confirm remote tips, reviewed heads, required checks and delivery permission. |
+| push, checks, authorization, gate, review, merge | Confirm remote tips, reviewed heads, required checks and delivery permission. `review` saves one commit's review, which `merge` reads; `merge` refuses commits after the reviewed head and a PR stacked on another open PR, and names the PRs stacked on the one it merged. |
+| brief | Print the delivery paragraph a parent pastes into a sub-agent's brief. |
 | worktree, cleanup, delete-merged | Create owned workspaces and remove only proven-preserved task resources. |
 | qa-check, qa-compare, report | Validate saved evidence and compare equivalent executions. |
 | codex-agents | Inspect or install missing project profiles without overwriting existing files. |

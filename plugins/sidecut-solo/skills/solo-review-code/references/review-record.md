@@ -12,7 +12,7 @@ Count unresolved blocker and major findings, Critical design findings and any mi
 
 Include whether design was reviewed and the reason when it was unavailable.
 
-Give solo-deliver-change inline review arguments or a JSON file outside the repository worktree.
+Save it with `solo review`, which solo-deliver-change's merge reads. Inline arguments or a JSON file outside the repository worktree also work.
 
 JSON fields are head, reviewer, blocking_findings and notes.
 

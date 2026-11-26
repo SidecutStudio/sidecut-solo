@@ -27,6 +27,7 @@ import { pluginRoot } from './lib/paths.ts';
 import { textReport } from './lib/present.ts';
 import { qaCommand } from './lib/qa.ts';
 import type { ReviewPolicy } from './lib/review.ts';
+import { lastReviewedBefore, loadReview, saveReview, unreviewedCommits } from './lib/reviews.ts';
 import { defaultTask, Store, type Task } from './lib/state.ts';
 import { userFacing } from './lib/surface.ts';
 import {
@@ -135,12 +136,29 @@ const COMMANDS: Record<string, Spec> = {
       ...AUTHORIZATION,
     },
   },
+  review: {
+    help: 'Save the review of one commit, which merge and the merge guard read',
+    options: {
+      'reviewed-head': { kind: 'string', required: true, about: 'full SHA the review covered' },
+      reviewer: { kind: 'string', required: true, choices: ['same-agent', 'independent', 'user'] },
+      'review-notes': { kind: 'string', required: true, about: 'what was reviewed and found' },
+      'blocking-findings': {
+        kind: 'string',
+        required: true,
+        about: 'unresolved blocker or major findings',
+      },
+    },
+  },
+  brief: {
+    help: "Print the paragraph to paste into a sub-agent's brief so its delivery goes through this helper",
+  },
   merge: {
     help: 'Merge the PR at the reviewed head once every requirement holds; starts a task record if there is none',
     options: {
       review: {
         kind: 'string',
-        about: 'review JSON file; or give the review inline with the next four',
+        about:
+          'review JSON file; or give the review inline with the next four; without either, the review saved for HEAD',
       },
       'reviewed-head': { kind: 'string', about: 'full SHA the review covered' },
       reviewer: { kind: 'string', choices: ['same-agent', 'independent', 'user'] },
@@ -339,20 +357,8 @@ function json(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-/** The review a merge relies on: a JSON file, or the same four fields given inline. */
-function reviewFrom(args: Parsed): object {
-  const inline = ['reviewed-head', 'reviewer', 'review-notes', 'blocking-findings'].filter(
-    (name) => args[name] !== undefined,
-  );
-  if (args.review !== undefined) {
-    if (inline.length)
-      throw new WorkflowError('merge: give --review or the inline review, not both');
-    return json(args.review as string) as object;
-  }
-  if (!inline.length)
-    throw new WorkflowError(
-      'merge: needs a review: --review <file>, or --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>',
-    );
+/** The four review fields given inline, with "none" read as a stated zero. */
+function inlineReview(args: Parsed) {
   const count = args['blocking-findings'] as string | undefined;
   // A review states its count; an unstated one never reads as zero, and the gate refuses it.
   // "none" is a stated zero: agents write it often enough that refusing it only cost a rerun.
@@ -363,11 +369,53 @@ function reviewFrom(args: Parsed): object {
         ? Number(count)
         : undefined;
   return {
-    head: args['reviewed-head'],
-    reviewer: args.reviewer,
-    notes: args['review-notes'],
+    head: args['reviewed-head'] as string | undefined,
+    reviewer: args.reviewer as string | undefined,
+    notes: args['review-notes'] as string | undefined,
     blocking_findings: findings,
   };
+}
+
+/**
+ * The review a merge relies on: a JSON file, the same four fields given inline, or the review
+ * `solo review` saved for HEAD.
+ */
+function reviewFrom(args: Parsed, repo: string): object {
+  const inline = ['reviewed-head', 'reviewer', 'review-notes', 'blocking-findings'].filter(
+    (name) => args[name] !== undefined,
+  );
+  if (args.review !== undefined) {
+    if (inline.length)
+      throw new WorkflowError('merge: give --review or the inline review, not both');
+    return json(args.review as string) as object;
+  }
+  if (inline.length) return inlineReview(args);
+  const head = inventory(repo).head;
+  const saved = loadReview(repo, head);
+  if (saved) return saved;
+  const below = lastReviewedBefore(repo, head);
+  throw new WorkflowError(
+    below
+      ? `merge: ${unreviewedCommits(below.head, below.after, head)}`
+      : 'merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>',
+  );
+}
+
+/** The paragraph a parent pastes into a sub-agent's brief for delivery in this repo. */
+function brief(repo: string, settings: ReturnType<typeof load>['config']): string {
+  const solo = `sh ${JSON.stringify(join(pluginRoot, 'server', 'data', 'helper', 'solo'))}`;
+  const checks = settings.required_checks?.length
+    ? settings.required_checks.join(', ')
+    : "the base branch's protection rules";
+  const policy = settings.merge ?? DEFAULTS.merge;
+  return [
+    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
+    `Push with \`solo push\`, then \`solo checks <pr> --reviewed-head <full sha>\`; every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
+    `Record the review of that head with \`solo review --reviewed-head <sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
+    'Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.',
+    `Repo: ${repo}`,
+  ].join(' ');
 }
 
 const VERSION = (() => {
@@ -533,6 +581,12 @@ async function main(argv: string[]): Promise<number> {
     case 'retired-names':
       result = retiredNames(repo);
       break;
+    case 'review':
+      result = saveReview(repo, inlineReview(args));
+      break;
+    case 'brief':
+      process.stdout.write(`${brief(repo, settings)}\n`);
+      return 0;
     case 'checks':
       result = collectChecks(
         repo,
@@ -572,7 +626,7 @@ async function main(argv: string[]): Promise<number> {
       } else if (command === 'run') {
         result = await run(store, args.key as string, args.rest, Number(args.timeout ?? 120));
       } else if (command === 'merge') {
-        const review = reviewFrom(args);
+        const review = reviewFrom(args, repo);
         const resolved = permission();
         if (resolved.merge_vetoed)
           throw new WorkflowError('repo settings set merge = "never"; configuration veto');
@@ -611,6 +665,7 @@ async function main(argv: string[]): Promise<number> {
           (args.method as string) ?? settings.merge_method ?? DEFAULTS.merge_method,
           required,
           problems,
+          settings.base_branch,
         );
       } else if (command === 'worktree')
         result = createWorktree(store, positional(0), (args.ref as string) ?? 'HEAD');
