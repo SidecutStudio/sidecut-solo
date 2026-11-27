@@ -267,6 +267,10 @@ describe('solo automerge and wait-merge', () => {
     const calls = fakeGh([
       { args: ['api', PR], replies: [open, open, open, open, { stdout: rest(head, true) }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
       labels('automerge'),
@@ -293,6 +297,10 @@ describe('solo automerge and wait-merge', () => {
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
@@ -332,6 +340,10 @@ describe('solo automerge and wait-merge', () => {
     let calls = fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false, 'clean') }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
@@ -343,10 +355,26 @@ describe('solo automerge and wait-merge', () => {
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false, 'unknown') }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
     expect(automerge(repo, '--no-wait').stderr).toContain('run solo automerge again in a moment');
+    // Auto-merge waits only for what branch protection requires; Solo's extra check must pass first.
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
+      checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['build'] } }],
+      },
+      handOff,
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait').stderr).toContain("branch protection doesn't require gate");
     // A label workflow decides for itself.
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false, 'clean') }] },
@@ -359,6 +387,10 @@ describe('solo automerge and wait-merge', () => {
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
       { args: ['api', '--paginate', '--slurp'], replies: [{ stdout: [{ check_runs: [] }] }] },
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
@@ -384,6 +416,10 @@ describe('solo automerge and wait-merge', () => {
           },
         ],
       },
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
@@ -400,6 +436,10 @@ describe('solo automerge and wait-merge', () => {
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);
@@ -417,6 +457,10 @@ describe('solo automerge and wait-merge', () => {
     const calls = fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(next, false) }] },
       checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/branches/main/protection/required_status_checks'],
+        replies: [{ stdout: { contexts: ['gate'] } }],
+      },
       handOff,
       statuses,
     ]);

@@ -4114,6 +4114,14 @@ async function automerge(repo, pr, options) {
       `GitHub reports this PR as ${state.toLowerCase() || "unknown"}, not blocked on its checks: if it is still working that out (unknown), run solo automerge again in a moment; otherwise fix what it reports first`
     );
   const prBase = seen.pr.baseRefName;
+  if (!options.label && options.require.length && prBase) {
+    const enforced = protectedChecks(repo, pr, prBase);
+    const early = seen.required_checks.filter((check) => !enforced.includes(String(check.name)) && check.bucket !== "pass").map((check) => String(check.name));
+    if (early.length)
+      reasons.push(
+        `branch protection doesn't require ${early.join(", ")}, so auto-merge wouldn't wait for ${early.length > 1 ? "them" : "it"}: hand it off once ${early.length > 1 ? "they pass" : "it passes"}, or merge with solo merge`
+      );
+  }
   if (options.base && prBase && prBase !== options.base) {
     const below = openPrs(repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
     if (below)

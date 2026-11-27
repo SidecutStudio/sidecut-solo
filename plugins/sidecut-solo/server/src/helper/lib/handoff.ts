@@ -7,7 +7,7 @@
 // the record and GitHub's own PR state; it never reads shell commands.
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { collectChecks, openPrs, prApi, validatePr } from './delivery.ts';
+import { collectChecks, openPrs, prApi, protectedChecks, validatePr } from './delivery.ts';
 import { commonDir, git, spawn, WorkflowError } from './git.ts';
 import { lastReviewedBefore, loadReview, reviewProblems, unreviewedCommits } from './reviews.ts';
 import { atomicJson, now } from './state.ts';
@@ -259,8 +259,20 @@ export async function automerge(repo: string, pr: string, options: AutomergeOpti
     reasons.push(
       `GitHub reports this PR as ${state.toLowerCase() || 'unknown'}, not blocked on its checks: if it is still working that out (unknown), run solo automerge again in a moment; otherwise fix what it reports first`,
     );
-  // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
   const prBase = (seen.pr as { baseRefName?: string }).baseRefName;
+  // GitHub auto-merge waits only for the checks branch protection requires; one Solo requires on
+  // top of those has to have passed already.
+  if (!options.label && options.require.length && prBase) {
+    const enforced = protectedChecks(repo, pr, prBase);
+    const early = seen.required_checks
+      .filter((check) => !enforced.includes(String(check.name)) && check.bucket !== 'pass')
+      .map((check) => String(check.name));
+    if (early.length)
+      reasons.push(
+        `branch protection doesn't require ${early.join(', ')}, so auto-merge wouldn't wait for ${early.length > 1 ? 'them' : 'it'}: hand it off once ${early.length > 1 ? 'they pass' : 'it passes'}, or merge with solo merge`,
+      );
+  }
+  // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
   if (options.base && prBase && prBase !== options.base) {
     const below = openPrs(repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
     if (below)

@@ -247,7 +247,7 @@ function commitChecks(repo: string, pr: string, sha: string): Json[] {
 }
 
 /** Check names branch protection requires on `base`; none when the branch isn't protected. */
-function protectedChecks(repo: string, pr: string, base: string): string[] {
+export function protectedChecks(repo: string, pr: string, base: string): string[] {
   const api = prApi(pr);
   const path = `${api.repoPath}/branches/${encodeURIComponent(base)}/protection/required_status_checks`;
   let required: Json;
