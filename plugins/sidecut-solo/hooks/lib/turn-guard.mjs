@@ -6,7 +6,9 @@
 // - Stop: while this session owns a handoff and no `solo wait-merge` is waiting on it, ending the
 //   turn is refused. CI watchers only speak up when something fails, so a clean merge would
 //   otherwise wake nobody and the steps after it would sit undone. wait-merge removes the record
-//   once the PR merges, closes or is no longer handed off.
+//   once the PR merges, closes or is no longer handed off. A watcher is a live process running
+//   `wait-merge` for the PR in this repo, including a background shell that loops or sleeps around
+//   it; the waiter PID wait-merge writes counts only while that PID is still a wait-merge.
 // - UserPromptSubmit: the Solo skills a prompt names are noted for the session.
 // - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
 //   loaded is raised once.
@@ -19,6 +21,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   renameSync,
   rmSync,
   statSync,
@@ -195,6 +198,112 @@ function alive(pid) {
   }
 }
 
+/** This user's other processes as { pid, command }, or undefined where `ps` can't be read. */
+function processes() {
+  try {
+    const uid = process.getuid?.();
+    return execFileSync('ps', ['-A', '-ww', '-o', 'pid=,uid=,command='], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1500,
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .split('\n')
+      .map((line) => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line))
+      .filter((m) => m && (uid === undefined || Number(m[2]) === uid))
+      .map((m) => ({ pid: Number(m[1]), command: m[3] }))
+      .filter(({ pid }) => pid !== process.pid);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Each `wait-merge` a command line runs, as { prs, repo }: the PR numbers its arguments name and
+ * its `--repo` value. A shell that wraps it (a loop, a `sleep` first, `| tail`) carries the same
+ * text, so it counts as the watcher between and before the runs.
+ */
+export function waitsIn(command) {
+  const found = [];
+  for (const part of String(command).split(/[;&|\n]+|\$\(|`/)) {
+    const at = /(?:^|[\s'"/])wait-merge(?=\s)/.exec(part);
+    if (!at) continue;
+    const words = part
+      .slice(at.index + at[0].length)
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.replace(/^['"]+|['")]+$/g, ''));
+    const prs = [];
+    let repo;
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      if (word === '--repo') repo = words[++i];
+      else if (word.startsWith('--repo=')) repo = word.slice(7);
+      else if (word.startsWith('-')) {
+        if (!word.includes('=')) i++;
+      } else {
+        const pr = /^(?:https:\/\/\S+\/pull\/)?([1-9][0-9]*)$/.exec(word)?.[1];
+        if (pr) prs.push(pr);
+      }
+    }
+    if (prs.length) found.push({ prs, repo });
+  }
+  return found;
+}
+
+/** A process's working directory, or undefined where it can't be read. */
+function cwdOfPid(pid) {
+  try {
+    const link = readlinkSync(`/proc/${pid}/cwd`);
+    if (link) return link;
+  } catch {}
+  try {
+    const out = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1500,
+    });
+    return /^n(.+)$/m.exec(out)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function commonDirOf(dir) {
+  try {
+    return git(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What is watching `dir`'s repo right now: `pids`, the processes that are a wait-merge or wrap one,
+ * and `prs`, the PR numbers they wait on. A process counts for this repo when its `--repo` or, with
+ * none, its working directory is in the same repo; one that can't be placed doesn't count, so the
+ * hook stays on the side of speaking up. `undefined` when processes can't be listed.
+ */
+function watchers(dir, list) {
+  if (!list) return undefined;
+  const mine = commonDirOf(dir);
+  const pids = new Set();
+  const prs = new Set();
+  const places = new Map();
+  const inRepo = (pid, repo) => {
+    const where = repo && existsSync(repo) ? repo : cwdOfPid(pid);
+    if (!where) return false;
+    if (!places.has(where)) places.set(where, commonDirOf(where));
+    return Boolean(mine) && places.get(where) === mine;
+  };
+  for (const { pid, command } of list) {
+    if (!/wait-merge/.test(command)) continue;
+    const waits = waitsIn(command);
+    if (waits.length) pids.add(pid);
+    for (const wait of waits) if (inRepo(pid, wait.repo)) for (const pr of wait.prs) prs.add(pr);
+  }
+  return { pids, prs };
+}
+
 /** This session's handoff records in `dir`'s repo, as [path, record]. */
 function ownHandoffs(input, dir) {
   const handoffs = handoffDir(dir);
@@ -210,13 +319,21 @@ function ownHandoffs(input, dir) {
 function handoffReason(input, dir) {
   const reasons = [];
   const records = ownHandoffs(input, dir);
-  // A record is watched by its own waiter. wait-merge claims the PR-number record, and a branch
-  // record counts as watched by any live waiter, since its number isn't known here.
-  const anyWaiter = records.some(([, record]) => alive(record.waiter?.pid));
+  if (!records.length) return '';
+  const seen = watchers(dir, processes());
+  // The waiter PID wait-merge wrote counts while it is alive and, where processes can be listed,
+  // still a wait-merge: a PID the system handed to something else after the watcher died doesn't.
+  const waiting = (record) =>
+    alive(record.waiter?.pid) && (!seen || seen.pids.has(record.waiter.pid));
+  const watching = (record) => waiting(record) || Boolean(seen?.prs.has(String(record.ref)));
+  // A branch record's PR number isn't known here, so any watcher in this repo covers it.
+  const anyWatcher = records.some(([, record]) => waiting(record)) || Boolean(seen?.prs.size);
   for (const [path, record] of records) {
-    const watched = alive(record.waiter?.pid) || (path.includes('/branch-') && anyWaiter);
+    const watched = watching(record) || (path.includes('/branch-') && anyWatcher);
     if (watched || (record.blocks ?? 0) >= MAX_BLOCKS) continue;
-    writeJson(path, { ...record, blocks: (record.blocks ?? 0) + 1 });
+    // Read again just before writing, so a waiter wait-merge claimed meanwhile isn't wiped.
+    const latest = readJson(path, record);
+    writeJson(path, { ...latest, blocks: (record.blocks ?? 0) + 1 });
     const pr = /^[1-9][0-9]*$/.test(String(record.ref))
       ? `PR #${record.ref}`
       : `the PR for ${record.ref}`;
@@ -275,7 +392,7 @@ export function notePrompt(input) {
       notes.named = [...new Set([...(notes.named ?? []), ...named])];
     });
   for (const [path, record] of ownHandoffs(input, cwdOf(input)))
-    if (record.blocks) writeJson(path, { ...record, blocks: 0 });
+    if (record.blocks) writeJson(path, { ...readJson(path, record), blocks: 0 });
 }
 
 /** PostToolUse: note a loaded Solo skill. */

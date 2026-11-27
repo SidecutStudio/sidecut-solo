@@ -1,10 +1,10 @@
 // The turn guard: a PR handed to automerge keeps the session going until something waits on it,
 // and skills a brief names are raised when they never load. The first test is the session the
 // builder-remote-connector record caught: label, end the turn, merge, nobody wakes.
-import { spawnSync } from 'node:child_process';
+import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import { git } from '../plugins/sidecut-solo/server/src/helper/lib/git.ts';
 import { cli, fakeGh, makeRepo, type Rule, scratch } from './helpers/fixture.ts';
 import { PLUGIN } from './package-rules.ts';
@@ -57,6 +57,31 @@ const prompt = (repo: string, text: string, session = 's1') => ({
 });
 
 const handoffs = (repo: string) => join(repo, '.git', 'solo-handoffs');
+
+// Stand-ins for a session's background watcher: a shell whose command line runs wait-merge, as
+// Claude Code's run_in_background and Codex's `bash -lc` keep it while the shell sleeps or loops.
+const started: ChildProcess[] = [];
+afterEach(() => {
+  for (const child of started.splice(0)) child.kill('SIGKILL');
+});
+async function watcher(script: string, cwd: string) {
+  const child = spawn('sh', ['-c', `sleep 30; ${script}`], { cwd, stdio: 'ignore' });
+  started.push(child);
+  // Wait until ps shows the shell's own command line rather than the fork before exec.
+  for (let i = 0; i < 100; i++) {
+    const ps = spawnSync('ps', ['-ww', '-o', 'command=', '-p', String(child.pid)], {
+      encoding: 'utf8',
+    });
+    if (ps.stdout.includes('wait-merge')) return child.pid as number;
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  throw new Error('the watcher never started');
+}
+const claim = (repo: string, pid: number, name = 'pr-461.json') =>
+  writeFileSync(
+    join(handoffs(repo), name),
+    JSON.stringify({ ...record(repo, name), waiter: { pid, at: 'now' } }),
+  );
 const record = (repo: string, name = 'pr-461.json') =>
   JSON.parse(readFileSync(join(handoffs(repo), name), 'utf8'));
 
@@ -73,22 +98,68 @@ describe('automerge handoff', () => {
     expect(refused?.reason).toContain('steps after the merge');
   });
 
-  test('a running wait-merge lets the turn end', () => {
+  test('a watcher running in the background lets the turn end, even between its runs', async () => {
+    // The Builder session: `sleep 60; for ...; do solo wait-merge 469 ...; done` in the background.
+    // No wait-merge process exists during the sleep, yet the session is watching.
     const repo = soloRepo();
     const home = scratch();
     hook(bash(repo, 'gh pr merge 461 --auto --squash'), home);
-    const path = join(handoffs(repo), 'pr-461.json');
-    writeFileSync(
-      path,
-      JSON.stringify({ ...record(repo), waiter: { pid: process.pid, at: 'now' } }),
+    await watcher(
+      `for i in 1 2; do out=$(sh "$S" wait-merge 461 --repo ${repo} --timeout 540 2>&1 | tail -5); done`,
+      scratch(),
     );
     expect(hook(stop(repo), home)).toBeNull();
-    // A waiter that has exited no longer counts.
-    writeFileSync(
-      path,
-      JSON.stringify({ ...record(repo), waiter: { pid: 2 ** 22 + 7, at: 'now' } }),
-    );
+    expect(hook(stop(repo), home)).toBeNull();
+    // The refusal count wasn't spent while it was watched.
+    expect(record(repo).blocks).toBe(0);
+  });
+
+  test('a watcher with no --repo counts by its working directory', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
+    await watcher('solo wait-merge https://github.com/o/r/pull/461', repo);
+    expect(hook(stop(repo), home)).toBeNull();
+  });
+
+  test('the waiter wait-merge wrote counts while that process is a wait-merge', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto --squash'), home);
+    // A wait-merge that ps can't place in this repo, so only its waiter PID speaks for it.
+    claim(repo, await watcher('solo wait-merge 461 --repo /nowhere', scratch()));
+    expect(hook(stop(repo), home)).toBeNull();
+  });
+
+  test('a stale waiter left by a dead watcher does not silence the hold', () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto --squash'), home);
+    // The watcher died and its PID is free.
+    claim(repo, 2 ** 22 + 7);
     expect(hook(stop(repo), home)?.decision).toBe('block');
+    // The watcher died and the system gave its PID to something else: this test runner.
+    claim(repo, process.pid);
+    expect(hook(stop(repo, 's1', true), home)?.decision).toBe('block');
+  });
+
+  test('a watcher for another PR or another repo is no watcher for this one', async () => {
+    const repo = soloRepo();
+    const other = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
+    await watcher(`solo wait-merge 4610 --repo ${repo}; solo wait-merge 461 --repo ${other}`, repo);
+    await watcher('solo wait-merge 461', other);
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
+  test('a session that never started a watcher is held', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    // Commands that only mention it are not watchers.
+    await watcher(': grep wait-merge-461 notes; echo wait-merge', repo);
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
   });
 
   test("auto-merge on this branch's PR, and the API forms, are recorded", () => {
@@ -129,7 +200,7 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo, 'other'), home)?.decision).toBe('block');
   });
 
-  test('a record with no session holds no one, and a waiter covers only its own PR', () => {
+  test('a record with no session holds no one, and a waiter covers only its own PR', async () => {
     const repo = soloRepo();
     const home = scratch();
     mkdirSync(handoffs(repo), { recursive: true });
@@ -137,11 +208,7 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)).toBeNull();
     hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
     hook(bash(repo, 'gh pr edit 462 --add-label automerge'), home);
-    const path = join(handoffs(repo), 'pr-461.json');
-    writeFileSync(
-      path,
-      JSON.stringify({ ...record(repo), waiter: { pid: process.pid, at: 'now' } }),
-    );
+    claim(repo, await watcher('solo wait-merge 461 --repo /nowhere', scratch()));
     const refused = hook(stop(repo), home);
     expect(refused?.reason).toContain('PR #462');
     expect(refused?.reason).not.toContain('PR #461');
@@ -252,6 +319,8 @@ describe('solo wait-merge', () => {
     expect(result.status).toBe('merged');
     expect(result.merge_commit).toBe('7f4d285');
     expect(readdirSync(handoffs(repo))).toEqual([]);
+    // Merged: nothing holds the turn any more.
+    expect(hook(stop(repo), home)).toBeNull();
   });
 
   test('a failed required check returns, and the hold comes back for the next stop', () => {
@@ -279,6 +348,31 @@ describe('solo wait-merge', () => {
       status: 'check-failed',
       failed_checks: ['gate'],
     });
+    expect(record(repo).waiter).toBeUndefined();
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
+  test('a wait that timed out gives the hold back', () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(false) }] },
+      checks(null),
+      statuses,
+      labels('automerge'),
+    ]);
+    const done = cli([
+      '--repo',
+      repo,
+      'wait-merge',
+      '461',
+      '--timeout',
+      '0.1',
+      '--interval',
+      '0.05',
+    ]);
+    expect(JSON.parse(done.stdout).status).toBe('timeout');
     expect(record(repo).waiter).toBeUndefined();
     expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
   });

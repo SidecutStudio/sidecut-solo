@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.41.4] - 2026-11-27
+
+### Fixed
+
+- The turn guard no longer re-prompts a session that is already waiting on its automerged PR. A watcher now counts while any of your processes runs `solo wait-merge` for that PR in the repo, including a background shell that sleeps or loops around it, so the gaps before and between runs no longer look like nobody is waiting. A waiter left behind by a dead `wait-merge`, even one whose process ID the system has handed to something else, no longer silences the hold, and a watcher for another PR or repo doesn't count. A Builder session running `sleep 60; for ...; do solo wait-merge 469; done` in the background was told to start `solo wait-merge 469` on every turn and had to answer "already running" each time.
+
 ## [0.41.3] - 2026-11-26
 
 ### Fixed
