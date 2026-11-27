@@ -10,7 +10,7 @@
 //   it skipped. A record is watched while the wait-merge that claimed it is alive and inside the
 //   wait it announced. Nothing here reads shell commands.
 // - UserPromptSubmit: the Solo skills the user's own words ask this session to run are noted. Relayed
-//   blocks (another session's message, a task notification, pasted text), quotes, code and sentences
+//   blocks (another session's message, a task notification, pasted text), quotes, code and clauses
 //   about a later step or another session don't count.
 // - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
 //   loaded is raised once.
@@ -255,36 +255,44 @@ const RELAYED = [
   'ci-monitor-event',
 ];
 const SKILL_NAME = /(?<![\w/-])(\/)?(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w/-])/g;
-// A sentence that puts a skill on a later step or on another session doesn't ask for it now.
+// A clause that puts a skill on a later step or on another session doesn't ask for it now.
 const DEFERRED =
   /\b(?:later|afterwards|after that|follow-?up|next step|(?:another|other|separate|side|new|next|parent) session|the session that started you)\b/i;
+// Clauses end at sentence ends, line breaks, commas and joining words, so one deferred clause
+// doesn't drop the skills the rest of the sentence asks for.
+const CLAUSE = /(?<=[.!?;:,])\s+|\n+|(?<=\s)(?:and|then|but|while|which|before)(?=\s)/i;
 
-/** The prompt's own words: relayed blocks, quotes and code left out. */
+/** The prompt's own words: code, relayed blocks and quotes left out. */
 function ownWords(prompt) {
-  let text = String(prompt);
-  for (const tag of RELAYED) {
-    const open = `<\\\\?~?${tag}\\b[^>]*>`;
-    const close = `<\\/\\\\?~?${tag}\\s*>`;
-    text = text.replace(new RegExp(`${open}[\\s\\S]*?(?:${close}|$)`, 'gi'), '\n');
-  }
-  return text
-    .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm, '\n')
-    .replace(/^[ \t]*>.*$/gm, '')
+  // Fences first, then inline code, so a tag named inside code isn't read as a relayed block.
+  // A backtick fence line holds no other backticks; `(?!`)` keeps each line to one match attempt.
+  let text = String(prompt)
+    .replace(
+      /^[ \t]*(`{3,}(?!`)(?=[^`\n]*$)|~{3,}(?!~))[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm,
+      '\n',
+    )
     .replace(/`([^`\n]*)`/g, (span, inner) =>
       /^\/?(?:sidecut-solo:)?solo-[a-z-]+$/.test(inner.trim()) ? inner : ' ',
     );
+  for (const tag of RELAYED) {
+    // A relayed block left open runs to the end of the prompt: what follows is still relayed.
+    const open = `<\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
+    const close = `<\\/\\\\?~?${tag}\\s*>`;
+    text = text.replace(new RegExp(`${open}[\\s\\S]*?(?:${close}|$)`, 'gi'), '\n');
+  }
+  return text.replace(/^[ \t]*>.*$/gm, '');
 }
 
 /**
  * Solo skills the user's own message asks this session to run, such as `solo-build-change` or
- * `/sidecut-solo:solo-deliver-change`. A slash command always counts; a name in a sentence about a
+ * `/sidecut-solo:solo-deliver-change`. A slash command always counts; a name in a clause about a
  * later step or another session doesn't.
  */
 export function namedSkills(prompt) {
   const found = new Set();
-  for (const sentence of ownWords(prompt).split(/(?<=[.!?;])\s+|\n+/)) {
-    const deferred = DEFERRED.test(sentence);
-    for (const [, slash, name] of sentence.matchAll(SKILL_NAME)) {
+  for (const clause of ownWords(prompt).split(CLAUSE)) {
+    const deferred = DEFERRED.test(clause);
+    for (const [, slash, name] of clause.matchAll(SKILL_NAME)) {
       if (deferred && !slash) continue;
       if (existsSync(join(SKILLS, name, 'SKILL.md'))) found.add(name);
     }

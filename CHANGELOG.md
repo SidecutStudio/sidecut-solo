@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- The turn guard now holds a session only to the Solo skills the user's own message asks it to run. Skill names inside another session's message, an agent message, a side-session event, a task notification, a CI event or pasted text no longer count, and neither do names in code, quoted lines or a sentence that leaves the skill to a later step or another session. A slash command always counts. An orchestrating session was told it hadn't loaded `solo-test-behavior` because a peer's report quoted it, and a session was raised about a skill its brief kept for a later step.
+- The turn guard now holds a session only to the Solo skills the user's own message asks it to run. Skill names inside another session's message, an agent message, a side-session event, a task notification, a CI event or pasted text no longer count, and neither do names in code, quoted lines or a clause that leaves the skill to a later step or another session (the rest of the sentence still counts). A slash command always counts. An orchestrating session was told it hadn't loaded `solo-test-behavior` because a peer's report quoted it, and a session was raised about a skill its brief kept for a later step.
 
 ## [0.42.0] - 2026-11-27
 

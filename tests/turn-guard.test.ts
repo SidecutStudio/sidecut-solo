@@ -652,6 +652,35 @@ describe('named skills', () => {
     expect(hook(stop(repo, 'q1'), home)).toBeNull();
   });
 
+  test('a deferred clause leaves the rest of its sentence counted, and code naming a tag is code', () => {
+    const home = scratch();
+    const repo = scratch();
+    const brief = [
+      'Fix it with solo-build-change and open a follow-up PR.',
+      'Use solo-review-code on the diff, which was written later in the day.',
+      'The `<task-notification>` tag is relayed, so plan with solo-plan-change.',
+      '```solo-write-copy``` is not a fence.',
+    ].join('\n');
+    hook(prompt(repo, brief, 'd1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'd1'), home)?.reason).toContain(
+      'sidecut-solo:solo-build-change, sidecut-solo:solo-review-code, sidecut-solo:solo-plan-change, sidecut-solo:solo-write-copy',
+    );
+  });
+
+  test('a huge run of one character is read quickly', () => {
+    const home = scratch();
+    const repo = scratch();
+    for (const text of [
+      '`'.repeat(200_000),
+      ' '.repeat(200_000),
+      '<agent-message '.repeat(20_000),
+    ]) {
+      const started = Date.now();
+      hook(prompt(repo, text, 'h1'), home, 'UserPromptSubmit');
+      expect(Date.now() - started).toBeLessThan(3000);
+    }
+  });
+
   test('own words beside a relayed block and a slash command still count, on Codex too', () => {
     const home = scratch();
     const repo = scratch();
