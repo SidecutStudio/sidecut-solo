@@ -696,6 +696,27 @@ describe('named skills', () => {
       expect(reason).not.toContain(`solo-${later}`);
   });
 
+  test('plural headings defer their lists, and a numbered plan resumes after its deferred step', () => {
+    const home = scratch();
+    const repo = scratch();
+    const brief = [
+      '1. Use solo-build-change',
+      '2. After that:',
+      '   - solo-deliver-change',
+      '     wrapped note about it',
+      '3. Use solo-review-code',
+      'Next steps:',
+      '- solo-test-behavior',
+      'Follow-ups: solo-write-copy',
+      'Afterward, run solo-compare-plugin in a fresh session.',
+    ].join('\n');
+    hook(prompt(repo, brief, 'n1'), home, 'UserPromptSubmit');
+    const reason = hook(stop(repo, 'n1'), home)?.reason ?? '';
+    expect(reason).toContain('sidecut-solo:solo-build-change, sidecut-solo:solo-review-code,');
+    for (const later of ['deliver-change', 'test-behavior', 'write-copy', 'compare-plugin'])
+      expect(reason).not.toContain(`solo-${later}`);
+  });
+
   test('a huge run of one character is read quickly', () => {
     const home = scratch();
     const repo = scratch();

@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- The turn guard now holds a session only to the Solo skills the user's own message asks it to run. Skill names inside another session's message, an agent message, a side-session event, a task notification, a CI event or pasted text no longer count, and neither do names in code, quoted lines or what a sentence leaves to a later step or another session, from the word that does so onward ("Later, run …", "Next step: …", a list under "After that:"). A skill the sentence asks for before that word still counts, and so does a slash command in the user's own words. An orchestrating session was told it hadn't loaded `solo-test-behavior` because a peer's report quoted it, and a session was raised about a skill its brief kept for a later step.
+- The turn guard now holds a session only to the Solo skills the user's own message asks it to run. Skill names inside another session's message, an agent message, a side-session event, a task notification, a CI event or pasted text no longer count. Neither do names in fenced or inline code (a skill name written alone as inline code still counts) or in quoted lines. A word that leaves work to a later step or another session ("later", "next steps", "follow-ups", "another session") defers the clause it's in and the rest of that sentence, and a heading like "After that:" defers the list under it until the list ends. Skills asked for in earlier clauses, and slash commands in the user's own words, still count. An orchestrating session was told it hadn't loaded `solo-test-behavior` because a peer's report quoted it, and a session was raised about a skill its brief kept for a later step.
 
 ## [0.42.0] - 2026-11-27
 

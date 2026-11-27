@@ -257,7 +257,7 @@ const RELAYED = [
 const SKILL_NAME = /(?<![\w/-])(\/)?(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w/-])/g;
 // Words that leave a skill to a later step or to another session.
 const DEFERRED =
-  /\b(?:later|afterwards|after that|follow-?up|next step|(?:another|other|separate|side|new|next|parent) session|the session that started you)\b/i;
+  /\b(?:later|afterwards?|after that|follow-?ups?|next steps?|(?:another|other|separate|side|new|next|parent|future|fresh) sessions?|the session that started you)\b/i;
 // A deferral covers its own clause and the rest of its sentence, so "Later, run X" and "Use X
 // (later: Y)" both read right, and a skill asked for before it still counts. A line ending in a
 // colon carries its deferral to the list items under it.
@@ -294,12 +294,18 @@ function ownWords(prompt) {
  */
 export function namedSkills(prompt) {
   const found = new Set();
-  let carried = false;
+  // The indent of the line whose deferral is carried, -1 for none. Deeper lines (its items, or an
+  // item's wrapped text) stay deferred, and so do items at its own level under a plain heading. A
+  // line back at its level or above ends the carry, so the next step of a numbered plan counts.
+  let carried = -1;
+  let headingIsItem = false;
   for (const line of ownWords(prompt).split('\n')) {
     if (!line.trim()) continue;
-    if (!LIST_ITEM.test(line)) carried = false;
+    const indent = /^\s*/.exec(line)[0].length;
+    const item = LIST_ITEM.test(line);
+    if (indent < carried || (indent === carried && (!item || headingIsItem))) carried = -1;
     for (const sentence of line.split(SENTENCE)) {
-      let deferred = carried;
+      let deferred = carried >= 0;
       for (const clause of sentence.split(CLAUSE)) {
         if (DEFERRED.test(clause)) deferred = true;
         for (const [, slash, name] of clause.matchAll(SKILL_NAME)) {
@@ -307,7 +313,10 @@ export function namedSkills(prompt) {
           if (existsSync(join(SKILLS, name, 'SKILL.md'))) found.add(name);
         }
       }
-      if (deferred && /:\s*$/.test(sentence)) carried = true;
+      if (deferred && /:\s*$/.test(sentence) && carried < 0) {
+        carried = indent;
+        headingIsItem = item;
+      }
     }
   }
   return [...found];
