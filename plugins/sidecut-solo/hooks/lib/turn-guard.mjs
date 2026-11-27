@@ -7,7 +7,7 @@
 //   turn is refused. CI watchers only speak up when something fails, so a clean merge would
 //   otherwise wake nobody and the steps after it would sit undone. wait-merge removes the record
 //   once the PR merges, closes or is no longer handed off. A watcher is a live process running
-//   `wait-merge` for the PR in this repo, including a background shell that loops or sleeps around
+//   `wait-merge` for the PR in this worktree, including a background shell that loops or sleeps around
 //   it; the waiter PID wait-merge writes counts only while that PID is still a wait-merge.
 // - UserPromptSubmit: the Solo skills a prompt names are noted for the session.
 // - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
@@ -308,6 +308,14 @@ function cwdOfPid(pid) {
   }
 }
 
+function topOf(dir) {
+  try {
+    return git(dir, ['rev-parse', '--show-toplevel']);
+  } catch {
+    return undefined;
+  }
+}
+
 function commonDirOf(dir) {
   try {
     return git(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
@@ -320,17 +328,18 @@ function commonDirOf(dir) {
 const PLACE_BUDGET_MS = 2500;
 
 /**
- * What is watching `dir`'s repo right now: `pids`, the processes running the Solo helper's
+ * What is watching `dir`'s worktree right now: `pids`, the processes running the Solo helper's
  * wait-merge, and `prs`, the PR numbers a watcher waits on here. Only waits on a PR in `wanted`
- * (or any, with `anyPr`) are placed. A process counts for this repo when its `--repo` (relative to
- * its working directory) or, with none, its working directory is in the same repo; one that can't
- * be placed in time doesn't count, so the hook stays on the side of speaking up. `undefined` when
- * processes can't be listed.
+ * (or any, with `anyPr`) are placed. A process counts when its `--repo` (relative to its working
+ * directory) or, with none, its working directory is in this same worktree: another worktree is
+ * another session's work. One that can't be placed in time doesn't count, so the hook stays on the
+ * side of speaking up. `undefined` when processes can't be listed.
  */
 function watchers(dir, list, wanted, anyPr) {
   if (!list) return undefined;
   const started = Date.now();
   const mine = commonDirOf(dir);
+  const top = topOf(dir);
   const pids = new Set();
   const prs = new Set();
   const cwds = new Map();
@@ -344,8 +353,9 @@ function watchers(dir, list, wanted, anyPr) {
     const base = cwd(pid);
     const where = repo ? (isAbsolute(repo) ? repo : base && resolve(base, repo)) : base;
     if (!where || !existsSync(where)) return false;
-    if (!places.has(where)) places.set(where, commonDirOf(where));
-    return places.get(where) === mine;
+    if (!places.has(where)) places.set(where, { common: commonDirOf(where), top: topOf(where) });
+    const place = places.get(where);
+    return Boolean(top) && place.common === mine && place.top === top;
   };
   for (const { pid, command } of list) {
     if (!/wait-merge/.test(command) || !canWatch(command)) continue;
@@ -388,13 +398,16 @@ function handoffReason(input, dir) {
   const waiting = (record) =>
     alive(record.waiter?.pid) && (!seen || seen.pids.has(record.waiter.pid));
   const watching = (record) => waiting(record) || Boolean(seen?.prs.has(String(record.ref)));
-  // A branch record's PR number isn't known here, so any watcher in this repo covers it.
+  // A branch record's PR number isn't known here, so any of this session's waiters, or a watcher in
+  // this worktree, covers it.
   const anyWatcher = records.some(([, record]) => waiting(record)) || Boolean(seen?.prs.size);
   for (const [path, record] of records) {
     const watched = watching(record) || (path.includes('/branch-') && anyWatcher);
     if (watched || (record.blocks ?? 0) >= MAX_BLOCKS) continue;
-    // Read again just before writing, so a waiter wait-merge claimed meanwhile isn't wiped.
-    const latest = readJson(path, record);
+    // Read again just before writing, so a waiter wait-merge claimed meanwhile isn't wiped, and a
+    // record it removed (the PR merged) isn't brought back.
+    const latest = readJson(path, undefined);
+    if (!latest) continue;
     writeJson(path, { ...latest, blocks: (record.blocks ?? 0) + 1 });
     const pr = /^[1-9][0-9]*$/.test(String(record.ref))
       ? `PR #${record.ref}`
@@ -454,7 +467,10 @@ export function notePrompt(input) {
       notes.named = [...new Set([...(notes.named ?? []), ...named])];
     });
   for (const [path, record] of ownHandoffs(input, cwdOf(input)))
-    if (record.blocks) writeJson(path, { ...readJson(path, record), blocks: 0 });
+    if (record.blocks) {
+      const latest = readJson(path, undefined);
+      if (latest) writeJson(path, { ...latest, blocks: 0 });
+    }
 }
 
 /** PostToolUse: note a loaded Solo skill. */

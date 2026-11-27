@@ -220,6 +220,23 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
   });
 
+  test("a watcher in another worktree is another session's, even for a branch's PR", async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge --auto --squash'), home);
+    hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
+    const other = join(scratch(), 'wt2');
+    git(repo, ['worktree', 'add', '-q', '-b', 'other', other]);
+    await watcher('solo wait-merge 500', other);
+    await watcher(`solo wait-merge 461 --repo ${other}`, scratch());
+    const refused = hook(stop(repo), home);
+    expect(refused?.reason).toContain('the PR for feature');
+    expect(refused?.reason).toContain('PR #461');
+    // A watcher in this worktree covers the branch's PR too.
+    await watcher('solo wait-merge 461', repo);
+    expect(hook(stop(repo, 's1', true), home)).toBeNull();
+  });
+
   test('a session that never started a watcher is held', async () => {
     const repo = soloRepo();
     const home = scratch();
