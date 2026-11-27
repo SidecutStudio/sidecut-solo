@@ -64,8 +64,8 @@ const started: ChildProcess[] = [];
 afterEach(() => {
   for (const child of started.splice(0)) child.kill('SIGKILL');
 });
-async function watcher(script: string, cwd: string) {
-  const child = spawn('sh', ['-c', `sleep 30; ${script}`], { cwd, stdio: 'ignore' });
+async function watcher(script: string, cwd: string, argv = ['sh', '-c', `sleep 30; ${script}`]) {
+  const child = spawn(argv[0] as string, argv.slice(1), { cwd, stdio: 'ignore' });
   started.push(child);
   // Wait until ps shows the shell's own command line rather than the fork before exec.
   for (let i = 0; i < 100; i++) {
@@ -77,6 +77,16 @@ async function watcher(script: string, cwd: string) {
   }
   throw new Error('the watcher never started');
 }
+// The Solo helper's own process, as the waiter PID names it: node running solo.mjs wait-merge.
+const helper = (args: string, cwd: string) =>
+  watcher('', cwd, [
+    'node',
+    '-e',
+    'setTimeout(() => {}, 30000)',
+    '/p/solo.mjs',
+    'wait-merge',
+    ...args.split(' '),
+  ]);
 const claim = (repo: string, pid: number, name = 'pr-461.json') =>
   writeFileSync(
     join(handoffs(repo), name),
@@ -127,7 +137,7 @@ describe('automerge handoff', () => {
     const home = scratch();
     hook(bash(repo, 'gh pr merge 461 --auto --squash'), home);
     // A wait-merge that ps can't place in this repo, so only its waiter PID speaks for it.
-    claim(repo, await watcher('solo wait-merge 461 --repo /nowhere', scratch()));
+    claim(repo, await helper('461 --repo /nowhere', scratch()));
     expect(hook(stop(repo), home)).toBeNull();
   });
 
@@ -150,6 +160,42 @@ describe('automerge handoff', () => {
     hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
     await watcher(`solo wait-merge 4610 --repo ${repo}; solo wait-merge 461 --repo ${other}`, repo);
     await watcher('solo wait-merge 461', other);
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
+  test('a background script written over several lines still counts', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    await watcher('for i in 1 2; do\n  solo wait-merge 461\ndone\nsleep 30', repo);
+    expect(hook(stop(repo), home)).toBeNull();
+  });
+
+  test('--repo before the subcommand, and a relative one, are read', async () => {
+    const repo = soloRepo();
+    const other = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    // Run from inside this repo, but waiting on the other repo's #461.
+    await watcher(`solo --repo ${other} wait-merge 461`, repo);
+    await watcher(`solo wait-merge 461 --repo ./elsewhere`, scratch());
+    expect(hook(stop(repo), home)?.decision).toBe('block');
+    await watcher(`solo wait-merge 461 --repo ./${repo.split('/').pop()}`, join(repo, '..'));
+    expect(hook(stop(repo, 's1', true), home)).toBeNull();
+  });
+
+  test('an agent whose prompt mentions wait-merge is no watcher', async () => {
+    // A task runner starts `claude -p ... -- <brief>` in the task's worktree.
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    await watcher('', repo, [
+      'node',
+      '-e',
+      'setTimeout(() => {}, 30000)',
+      '--',
+      'PR 461 is on automerge. Run solo wait-merge 461, then tag.',
+    ]);
     expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
   });
 
@@ -208,7 +254,7 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)).toBeNull();
     hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
     hook(bash(repo, 'gh pr edit 462 --add-label automerge'), home);
-    claim(repo, await watcher('solo wait-merge 461 --repo /nowhere', scratch()));
+    claim(repo, await helper('461 --repo /nowhere', scratch()));
     const refused = hook(stop(repo), home);
     expect(refused?.reason).toContain('PR #462');
     expect(refused?.reason).not.toContain('PR #461');

@@ -28,7 +28,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -198,55 +198,83 @@ function alive(pid) {
   }
 }
 
-/** This user's other processes as { pid, command }, or undefined where `ps` can't be read. */
+/**
+ * This user's processes as { pid, command }, leaving out this hook and the processes above it
+ * (the agent whose brief may well mention wait-merge), or undefined where `ps` can't be read.
+ */
 function processes() {
   try {
     const uid = process.getuid?.();
-    return execFileSync('ps', ['-A', '-ww', '-o', 'pid=,uid=,command='], {
+    const all = execFileSync('ps', ['-A', '-ww', '-o', 'pid=,ppid=,uid=,command='], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 1500,
       maxBuffer: 64 * 1024 * 1024,
     })
       .split('\n')
-      .map((line) => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line))
-      .filter((m) => m && (uid === undefined || Number(m[2]) === uid))
-      .map((m) => ({ pid: Number(m[1]), command: m[3] }))
-      .filter(({ pid }) => pid !== process.pid);
+      .map((line) => /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/.exec(line))
+      .filter(Boolean)
+      .map((m) => ({ pid: Number(m[1]), ppid: Number(m[2]), uid: Number(m[3]), command: m[4] }));
+    const parent = new Map(all.map(({ pid, ppid }) => [pid, ppid]));
+    const above = new Set([process.pid]);
+    for (let pid = process.ppid; pid > 1 && !above.has(pid); pid = parent.get(pid) ?? 0)
+      above.add(pid);
+    return all.filter((p) => !above.has(p.pid) && (uid === undefined || p.uid === uid));
   } catch {
     return undefined;
   }
 }
 
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'mksh', 'ash', 'fish']);
+
 /**
- * Each `wait-merge` a command line runs, as { prs, repo }: the PR numbers its arguments name and
- * its `--repo` value. A shell that wraps it (a loop, a `sleep` first, `| tail`) carries the same
- * text, so it counts as the watcher between and before the runs.
+ * Whether a process can be a watcher: a shell (which keeps its whole script on its command line,
+ * so a loop or a `sleep` before the run still shows it) or node running the Solo helper. An agent
+ * whose prompt only mentions wait-merge is neither.
+ */
+function canWatch(command) {
+  const first = /^\S+/.exec(command)?.[0] ?? '';
+  const name = first.split('/').pop().replace(/^-/, '');
+  if (SHELLS.has(name)) return true;
+  return (
+    /^node(?:\d[\w.]*)?$/.test(name) &&
+    /solo\.mjs\s+(?:--repo[= ]\S+\s+)?wait-merge\b/.test(command)
+  );
+}
+
+/** A Solo launcher word just before `wait-merge`: `solo`, a path to it, or a variable holding one. */
+const LAUNCH =
+  /(?:(?:^|[\s'"(])(?:\S*\/)?solo(?:\.mjs)?|(?:^|\s)"?\$\{?\w+\}?"?)['"]?((?:\s+--repo(?:=|\s+)\S+)?)\s+wait-merge(?=\s|$)/g;
+
+/**
+ * Each `solo wait-merge` a command line runs, as { pr, repo }: the one PR it waits on and its
+ * `--repo` value. A shell that wraps it (a loop, a `sleep` first, `| tail`) carries the same text,
+ * so it counts as the watcher before and between the runs. macOS `ps` shows a newline as `\012`.
  */
 export function waitsIn(command) {
   const found = [];
-  for (const part of String(command).split(/[;&|\n]+|\$\(|`/)) {
-    const at = /(?:^|[\s'"/])wait-merge(?=\s)/.exec(part);
-    if (!at) continue;
-    const words = part
-      .slice(at.index + at[0].length)
-      .trim()
-      .split(/\s+/)
-      .map((word) => word.replace(/^['"]+|['")]+$/g, ''));
-    const prs = [];
-    let repo;
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      if (word === '--repo') repo = words[++i];
-      else if (word.startsWith('--repo=')) repo = word.slice(7);
-      else if (word.startsWith('-')) {
-        if (!word.includes('=')) i++;
-      } else {
-        const pr = /^(?:https:\/\/\S+\/pull\/)?([1-9][0-9]*)$/.exec(word)?.[1];
-        if (pr) prs.push(pr);
+  for (const part of String(command).split(/\\012|[;&|\n]+|\$\(|`/)) {
+    for (const at of part.matchAll(LAUNCH)) {
+      let repo = /--repo(?:=|\s+)(\S+)/.exec(at[1] ?? '')?.[1];
+      const words = part
+        .slice((at.index ?? 0) + at[0].length)
+        .trim()
+        .split(/\s+/)
+        .map((word) => word.replace(/^['"]+|['")]+$/g, ''));
+      let pr;
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        if (word === '--repo') repo = words[++i];
+        else if (word.startsWith('--repo=')) repo = word.slice(7);
+        else if (word.startsWith('-')) {
+          if (!word.includes('=')) i++;
+        } else if (pr === undefined) {
+          // wait-merge takes one PR; the first other word is it, or this isn't a wait we can read.
+          pr = /^(?:https:\/\/\S+\/pull\/)?([1-9][0-9]*)$/.exec(word)?.[1] ?? '';
+        }
       }
+      if (pr) found.push({ pr, repo: repo?.replace(/^['"]+|['"]+$/g, '') });
     }
-    if (prs.length) found.push({ prs, repo });
   }
   return found;
 }
@@ -261,7 +289,7 @@ function cwdOfPid(pid) {
     const out = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1500,
+      timeout: 1000,
     });
     return /^n(.+)$/m.exec(out)?.[1];
   } catch {
@@ -277,29 +305,44 @@ function commonDirOf(dir) {
   }
 }
 
+/** How long placing watchers may take before the hook gives up and speaks up instead. */
+const PLACE_BUDGET_MS = 2500;
+
 /**
- * What is watching `dir`'s repo right now: `pids`, the processes that are a wait-merge or wrap one,
- * and `prs`, the PR numbers they wait on. A process counts for this repo when its `--repo` or, with
- * none, its working directory is in the same repo; one that can't be placed doesn't count, so the
- * hook stays on the side of speaking up. `undefined` when processes can't be listed.
+ * What is watching `dir`'s repo right now: `pids`, the processes running the Solo helper's
+ * wait-merge, and `prs`, the PR numbers a watcher waits on here. Only waits on a PR in `wanted`
+ * (or any, with `anyPr`) are placed. A process counts for this repo when its `--repo` (relative to
+ * its working directory) or, with none, its working directory is in the same repo; one that can't
+ * be placed in time doesn't count, so the hook stays on the side of speaking up. `undefined` when
+ * processes can't be listed.
  */
-function watchers(dir, list) {
+function watchers(dir, list, wanted, anyPr) {
   if (!list) return undefined;
+  const started = Date.now();
   const mine = commonDirOf(dir);
   const pids = new Set();
   const prs = new Set();
+  const cwds = new Map();
   const places = new Map();
+  const cwd = (pid) => {
+    if (!cwds.has(pid)) cwds.set(pid, cwdOfPid(pid));
+    return cwds.get(pid);
+  };
   const inRepo = (pid, repo) => {
-    const where = repo && existsSync(repo) ? repo : cwdOfPid(pid);
-    if (!where) return false;
+    if (!mine || Date.now() - started > PLACE_BUDGET_MS) return false;
+    const base = cwd(pid);
+    const where = repo ? (isAbsolute(repo) ? repo : base && resolve(base, repo)) : base;
+    if (!where || !existsSync(where)) return false;
     if (!places.has(where)) places.set(where, commonDirOf(where));
-    return Boolean(mine) && places.get(where) === mine;
+    return places.get(where) === mine;
   };
   for (const { pid, command } of list) {
-    if (!/wait-merge/.test(command)) continue;
+    if (!/wait-merge/.test(command) || !canWatch(command)) continue;
     const waits = waitsIn(command);
-    if (waits.length) pids.add(pid);
-    for (const wait of waits) if (inRepo(pid, wait.repo)) for (const pr of wait.prs) prs.add(pr);
+    if (waits.length && !SHELLS.has(/^\S+/.exec(command)[0].split('/').pop().replace(/^-/, '')))
+      pids.add(pid);
+    for (const { pr, repo } of waits)
+      if ((anyPr || wanted.has(pr)) && !prs.has(pr) && inRepo(pid, repo)) prs.add(pr);
   }
   return { pids, prs };
 }
@@ -320,7 +363,15 @@ function handoffReason(input, dir) {
   const reasons = [];
   const records = ownHandoffs(input, dir);
   if (!records.length) return '';
-  const seen = watchers(dir, processes());
+  const numbered = (record) => /^[1-9][0-9]*$/.test(String(record.ref));
+  const seen = watchers(
+    dir,
+    processes(),
+    new Set(
+      records.map(([, record]) => String(record.ref)).filter((ref) => /^[1-9][0-9]*$/.test(ref)),
+    ),
+    records.some(([, record]) => !numbered(record)),
+  );
   // The waiter PID wait-merge wrote counts while it is alive and, where processes can be listed,
   // still a wait-merge: a PID the system handed to something else after the watcher died doesn't.
   const waiting = (record) =>
