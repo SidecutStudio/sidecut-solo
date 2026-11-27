@@ -591,130 +591,105 @@ describe('solo automerge and wait-merge', () => {
 });
 
 describe('named skills', () => {
-  test('a brief naming three skills raises the two that never loaded, once', () => {
+  const skillTool = (session: string, repo: string, skill: string) => ({
+    hook_event_name: 'PostToolUse',
+    session_id: session,
+    cwd: repo,
+    tool_name: 'Skill',
+    tool_input: { skill: `sidecut-solo:${skill}` },
+  });
+
+  test('a slash-command ask that never loaded gets one reminder', () => {
     const home = scratch();
     const repo = scratch();
-    mkdirSync(join(repo, 'x'));
-    const brief =
-      'Plan with `solo-plan-change`, build with `solo-build-change`, and deliver through `sidecut-solo:solo-deliver-change`. Not solo-made-up.';
-    hook(prompt(repo, brief), home, 'UserPromptSubmit');
-    hook(
-      {
-        hook_event_name: 'PostToolUse',
-        session_id: 's1',
-        cwd: repo,
-        tool_name: 'Skill',
-        tool_input: { skill: 'sidecut-solo:solo-plan-change' },
-      },
-      home,
-      'PostToolUse',
-    );
+    const ask =
+      'Fix the hook, then /sidecut-solo:solo-review-code and /sidecut-solo:solo-deliver-change. Also /sidecut-solo:solo-plan-change and /sidecut-solo:solo-made-up.';
+    hook(prompt(repo, ask), home, 'UserPromptSubmit');
+    hook(skillTool('s1', repo, 'solo-plan-change'), home, 'PostToolUse');
     const raised = hook(stop(repo), home);
     expect(raised?.decision).toBe('block');
     expect(raised?.reason).toContain(
-      'sidecut-solo:solo-build-change, sidecut-solo:solo-deliver-change',
+      'sidecut-solo:solo-review-code, sidecut-solo:solo-deliver-change',
     );
     expect(raised?.reason).not.toContain('solo-plan-change');
     expect(raised?.reason).not.toContain('made-up');
     expect(hook(stop(repo), home)).toBeNull();
   });
 
-  test('a skill quoted in a peer session message is not this session’s', () => {
+  test('prose names in a brief never trigger it', () => {
     const home = scratch();
     const repo = scratch();
-    const relayed = [
-      '<cross-session-message from="local_x">Ran `sidecut-solo:solo-test-behavior`; PR #3 is green.</cross-session-message>',
-      '<~agent-message>use solo-review-code</~agent-message>',
-      '<side-sessions-event>solo-plan-change finished</side-sessions-event>',
-      '<pasted_content id="p1">Run /sidecut-solo:solo-deliver-change now.</pasted_content>',
-      '<task-notification>solo-diagnose-problem done',
-    ];
-    for (const [i, text] of relayed.entries()) {
-      const session = `r${i}`;
-      hook(prompt(repo, `Thanks, carry on.\n${text}`, session), home, 'UserPromptSubmit');
-      expect(hook(stop(repo, session), home)).toBeNull();
-    }
+    const brief =
+      'Plan with `solo-plan-change`, build with solo-build-change and deliver through sidecut-solo:solo-deliver-change. Next steps: /solo-test-behavior.';
+    hook(prompt(repo, brief, 'b1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'b1'), home)).toBeNull();
   });
 
-  test('skills inside code, quotes or meant for a later step are left out', () => {
+  test('slash commands in quotes, code or relayed text never trigger it', () => {
     const home = scratch();
     const repo = scratch();
-    const brief = [
-      'Fix the hook and add tests.',
+    const quoted = [
+      'Thanks, carry on.',
+      '<cross-session-message from="local_x">Ran /sidecut-solo:solo-test-behavior; green.</cross-session-message>',
+      '<~agent-message>/sidecut-solo:solo-review-code</~agent-message>',
+      '<side-sessions-event>/sidecut-solo:solo-plan-change finished</side-sessions-event>',
+      '<pasted_content id="p1">Run /sidecut-solo:solo-deliver-change now.</pasted_content>',
+      '> Earlier: /sidecut-solo:solo-write-copy',
+      'Compare `/sidecut-solo:solo-build-change` with:',
       '```',
-      'solo review --skill solo-review-code',
+      '/sidecut-solo:solo-compare-plugin',
       '```',
-      '> Earlier the user said: use solo-write-copy.',
-      'Run `sed -n 1p skills/solo-build-change/SKILL.md` to compare.',
-      'A later step runs solo-test-behavior, and the session that started you will use solo-compare-plugin.',
+      'Path skills/sidecut-solo:solo-diagnose-problem/SKILL.md',
+      '<task-notification>/sidecut-solo:solo-research-topic done',
     ].join('\n');
-    hook(prompt(repo, brief, 'q1'), home, 'UserPromptSubmit');
+    hook(prompt(repo, quoted, 'q1'), home, 'UserPromptSubmit');
     expect(hook(stop(repo, 'q1'), home)).toBeNull();
   });
 
-  test('a deferred clause leaves the rest of its sentence counted, and code naming a tag is code', () => {
+  test('a skill the host loads itself, or a prompt the host made, needs no reminder', () => {
     const home = scratch();
     const repo = scratch();
-    const brief = [
-      'Fix it with solo-build-change and open a follow-up PR.',
-      'Use solo-review-code on the diff, which was written later in the day.',
-      'The `<task-notification>` tag is relayed, so plan with solo-plan-change.',
-      '```solo-write-copy``` is not a fence.',
-    ].join('\n');
-    hook(prompt(repo, brief, 'd1'), home, 'UserPromptSubmit');
-    expect(hook(stop(repo, 'd1'), home)?.reason).toContain(
-      'sidecut-solo:solo-build-change, sidecut-solo:solo-review-code, sidecut-solo:solo-plan-change, sidecut-solo:solo-write-copy',
-    );
+    // Claude Code expands a slash command that opens the prompt; Codex injects a `$` mention.
+    hook(prompt(repo, '/sidecut-solo:solo-review-code PR 31', 'h1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'h1'), home)).toBeNull();
+    const codex = {
+      ...prompt(repo, 'Run $sidecut-solo:solo-test-behavior on it', 'h2'),
+      turn_id: 't',
+    };
+    hook(codex, home, 'UserPromptSubmit');
+    expect(hook({ ...stop(repo, 'h2'), turn_id: 't' }, home)).toBeNull();
+    const wakeup = {
+      ...prompt(repo, 'Then /sidecut-solo:solo-deliver-change', 'h3'),
+      source: 'loop_wakeup',
+    };
+    hook(wakeup, home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'h3'), home)).toBeNull();
   });
 
-  test('a deferral leading a clause or a list covers what follows it', () => {
+  test('Codex raises an owed slash command the same way, and a read SKILL.md counts as loaded', () => {
     const home = scratch();
     const repo = scratch();
-    const brief = [
-      'Later, run solo-deliver-change.',
-      'Next step: solo-test-behavior',
-      'Use solo-build-change (later: solo-compare-plugin)',
-      'Plan with solo-plan-change — another session runs solo-write-copy.',
-      'After that:',
-      '- solo-diagnose-problem',
-      '- solo-research-topic',
-      'Now check it with solo-review-code.',
-    ].join('\n');
-    hook(prompt(repo, brief, 'l1'), home, 'UserPromptSubmit');
-    const reason = hook(stop(repo, 'l1'), home)?.reason ?? '';
-    expect(reason).toContain(
-      'sidecut-solo:solo-build-change, sidecut-solo:solo-plan-change, sidecut-solo:solo-review-code,',
+    const ask =
+      'Review it, then /sidecut-solo:solo-review-code and /sidecut-solo:solo-deliver-change.';
+    hook({ ...prompt(repo, ask, 'c1'), turn_id: 't' }, home, 'UserPromptSubmit');
+    hook(
+      {
+        hook_event_name: 'PostToolUse',
+        session_id: 'c1',
+        turn_id: 't',
+        cwd: repo,
+        tool_name: 'Bash',
+        tool_input: {
+          command: `sed -n 1,200p ${join(PLUGIN, 'skills', 'solo-review-code', 'SKILL.md')}`,
+        },
+      },
+      home,
+      'PostToolUse',
     );
-    for (const later of [
-      'deliver-change',
-      'test-behavior',
-      'compare-plugin',
-      'write-copy',
-      'diagnose-problem',
-      'research-topic',
-    ])
-      expect(reason).not.toContain(`solo-${later}`);
-  });
-
-  test('plural headings defer their lists, and a numbered plan resumes after its deferred step', () => {
-    const home = scratch();
-    const repo = scratch();
-    const brief = [
-      '1. Use solo-build-change',
-      '2. After that:',
-      '   - solo-deliver-change',
-      '     wrapped note about it',
-      '3. Use solo-review-code',
-      'Next steps:',
-      '- solo-test-behavior',
-      'Follow-ups: solo-write-copy',
-      'Afterward, run solo-compare-plugin in a fresh session.',
-    ].join('\n');
-    hook(prompt(repo, brief, 'n1'), home, 'UserPromptSubmit');
-    const reason = hook(stop(repo, 'n1'), home)?.reason ?? '';
-    expect(reason).toContain('sidecut-solo:solo-build-change, sidecut-solo:solo-review-code,');
-    for (const later of ['deliver-change', 'test-behavior', 'write-copy', 'compare-plugin'])
-      expect(reason).not.toContain(`solo-${later}`);
+    const raised = hook({ ...stop(repo, 'c1'), turn_id: 't' }, home);
+    expect(raised?.decision).toBe('block');
+    expect(raised?.reason).toContain('sidecut-solo:solo-deliver-change');
+    expect(raised?.reason).not.toContain('solo-review-code');
   });
 
   test('a huge run of one character is read quickly', () => {
@@ -726,44 +701,8 @@ describe('named skills', () => {
       '<agent-message '.repeat(20_000),
     ]) {
       const started = Date.now();
-      hook(prompt(repo, text, 'h1'), home, 'UserPromptSubmit');
+      hook(prompt(repo, text, 'p1'), home, 'UserPromptSubmit');
       expect(Date.now() - started).toBeLessThan(3000);
     }
-  });
-
-  test('own words beside a relayed block and a slash command still count, on Codex too', () => {
-    const home = scratch();
-    const repo = scratch();
-    const text =
-      '<cross-session-message>solo-test-behavior passed</cross-session-message>\nNow review it with solo-review-code.\n/sidecut-solo:solo-deliver-change after that.';
-    hook({ ...prompt(repo, text, 'c1'), turn_id: 't' }, home, 'UserPromptSubmit');
-    const raised = hook({ ...stop(repo, 'c1'), turn_id: 't' }, home);
-    expect(raised?.decision).toBe('block');
-    expect(raised?.reason).toContain(
-      'sidecut-solo:solo-review-code, sidecut-solo:solo-deliver-change',
-    );
-    expect(raised?.reason).not.toContain('solo-test-behavior');
-  });
-
-  test('a brief whose named skills all loaded ends the turn quietly', () => {
-    const home = scratch();
-    const repo = scratch();
-    hook(prompt(repo, 'Use solo-review-code.', 's2'), home, 'UserPromptSubmit');
-    // Codex reads the skill with a shell command instead of a Skill tool.
-    hook(
-      {
-        hook_event_name: 'PostToolUse',
-        session_id: 's2',
-        turn_id: 't',
-        cwd: repo,
-        tool_name: 'Bash',
-        tool_input: {
-          command: `sed -n 1,200p ${join(PLUGIN, 'skills', 'solo-review-code', 'SKILL.md')}`,
-        },
-      },
-      home,
-      'PostToolUse',
-    );
-    expect(hook(stop(repo, 's2'), home)).toBeNull();
   });
 });

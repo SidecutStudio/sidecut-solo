@@ -90,6 +90,6 @@ Without delegation, do a separate careful pass and label it same-agent. If a wor
 
 Where Solo settings exist, the merge guard refuses any gh merge run in the shell: `solo merge` and `solo automerge` are the ways to merge or hand off. Never rely on hooks as the merge boundary or merge with an admin override yourself.
 
-In Claude Code, Codex and Antigravity the turn guard refuses to end a turn while a PR handed to automerge from this worktree is unmerged and no `solo wait-merge` waits on it. It reads the record `solo automerge` writes and GitHub's view of the branch's PR, so a label or auto-merge set outside Solo is caught too. In Claude Code and Codex it also raises once a skill the prompt named that never loaded.
+In Claude Code, Codex and Antigravity the turn guard refuses to end a turn while a PR handed to automerge from this worktree is unmerged and no `solo wait-merge` waits on it. It reads the record `solo automerge` writes and GitHub's view of the branch's PR, so a label or auto-merge set outside Solo is caught too. In Claude Code and Codex it also names, once, a skill the user asked for with a `/sidecut-solo:solo-x` slash command that never loaded.
 
 Check each host's active hook configuration and trust state. Installed files alone do not prove a hook ran.
