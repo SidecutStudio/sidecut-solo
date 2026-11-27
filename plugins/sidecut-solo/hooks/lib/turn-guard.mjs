@@ -293,11 +293,41 @@ function stripFences(text) {
   return kept.join('\n');
 }
 
+/**
+ * Drops inline code: a run of backticks opens a span that closes at the next run of the same length
+ * on its line, and a run with no partner stays as text. Each run's partner is found in one pass from
+ * the end of the line, so a line of many different run lengths stays linear.
+ */
+function stripInlineCode(text) {
+  return text
+    .split('\n')
+    .map((line) => {
+      if (!line.includes('`')) return line;
+      const runs = [...line.matchAll(/`+/g)].map((run) => [run.index, run[0].length]);
+      const partner = [];
+      const after = new Map();
+      for (let j = runs.length - 1; j >= 0; j--) {
+        partner[j] = after.get(runs[j][1]);
+        after.set(runs[j][1], j);
+      }
+      let kept = '';
+      let from = 0;
+      for (let j = 0; j < runs.length; j++) {
+        const close = partner[j];
+        if (close === undefined) continue;
+        kept += `${line.slice(from, runs[j][0])} `;
+        from = runs[close][0] + runs[close][1];
+        j = close;
+      }
+      return kept + line.slice(from);
+    })
+    .join('\n');
+}
+
 /** The prompt's own words: code, relayed blocks and quoted lines left out. */
 function ownWords(prompt) {
   // Code first, so a tag named inside code isn't read as a relayed block.
-  // Inline code closes at a run of the same number of backticks.
-  let text = stripFences(String(prompt)).replace(/(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)/g, ' ');
+  let text = stripInlineCode(stripFences(String(prompt)));
   for (const tag of RELAYED) {
     // A relayed block left open runs to the end of the prompt: what follows is still relayed.
     const open = `<\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
