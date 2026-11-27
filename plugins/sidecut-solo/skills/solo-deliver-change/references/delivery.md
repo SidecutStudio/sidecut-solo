@@ -82,9 +82,9 @@ Use --auto only under those provider-enforced checks. Never merge with an admin 
 
 A repository-required label, merge queue or workflow can replace the helper merge, but cannot replace its permission, review or check gates.
 
-Run checks --reviewed-head immediately before triggering it. Report the handoff until the provider confirms merging.
+Run checks --reviewed-head immediately before triggering it.
 
-Continue following the requested outcome without repeated idle polling.
+Then run solo wait-merge PR. It returns when the PR merges, closes or fails a required check, or at its timeout; run it again after a timeout. Where the host wakes the session when a background command exits, run it in the background and carry on with independent work. A CI watcher such as Auto-fix speaks up only on failures, so it never stands in for the wait.
 
 Recheck the reviewed head after confirmation. Any new push needs fresh review and checks, and may require removing the trigger.
 

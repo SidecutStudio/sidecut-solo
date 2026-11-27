@@ -99,6 +99,8 @@ Separate Claude Code and Codex hook files register the same installed scripts wi
 
 The merge guard rejects admin merges in configured repositories, and any other merge run outside the helper unless it names a head with a clean saved review (`gh pr merge --match-head-commit SHA`). It reads command data rather than descriptions, follows a `cd` earlier in the same command, and does not enforce a sandbox boundary.
 
+The turn guard hooks record a command that hands a PR to automerge (a merge label or GitHub auto-merge) under the Git common directory at `solo-handoffs/`, and at Stop refuse to end the turn while one of the session's records has no live `solo wait-merge` waiting on it. They give way after two refusals in a row, until the next prompt. Only `wait-merge` reads GitHub and removes a record, once the PR merges, closes or is no longer handed off. The same hooks note the Solo skills a prompt names and the ones the session loads, in `~/.sidecut/solo/sessions/`, and raise once each named skill that never loaded. Antigravity runs neither guard yet.
+
 A malformed or unavailable hook input fails open without becoming merge permission. Helper gates remain responsible for delivery checks and permission.
 
 The standard skill log is local and on by default (opt out via `SIDECUT_SKILL_LOG=0`, `DO_NOT_TRACK=1`, or CI). The retained usage receiver, dashboard and helper refusal logging remain supported by explicit comparison scope.
@@ -131,6 +133,7 @@ A hands-off task ([hands-off.md](hands-off.md)) takes the recommended option at 
 | start, resume, checkpoint, reconcile, run | Preserve recoverable task state and track bounded command outcomes. |
 | user-facing | Identify visible changes, whether rendered design review is needed, and the suggested review level. |
 | push, checks, authorization, gate, review, merge | Confirm remote tips, reviewed heads, required checks and delivery permission. `review` saves one commit's review, which `merge` reads; `merge` refuses commits after the reviewed head and a PR stacked on another open PR, and names the PRs stacked on the one it merged. |
+| wait-merge | Wait for a PR handed to automerge to merge, close or fail a required check, then say what comes next. While it runs, the turn guard lets the turn end. |
 | brief | Print the delivery paragraph a parent pastes into a sub-agent's brief. |
 | worktree, cleanup, delete-merged | Create owned workspaces and remove only proven-preserved task resources. |
 | qa-check, qa-compare, report | Validate saved evidence and compare equivalent executions. |

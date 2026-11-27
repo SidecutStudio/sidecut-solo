@@ -22,6 +22,7 @@ import {
 import { docsCheck } from './lib/docs.ts';
 import { run } from './lib/execution.ts';
 import { freshRemoteState, inventory, mergedBranches, WorkflowError } from './lib/git.ts';
+import { waitMerge } from './lib/handoff.ts';
 import { retiredNames } from './lib/names.ts';
 import { pluginRoot } from './lib/paths.ts';
 import { textReport } from './lib/present.ts';
@@ -172,6 +173,15 @@ const COMMANDS: Record<string, Spec> = {
       },
       method: { kind: 'string', choices: MERGE_METHODS },
       ...AUTHORIZATION,
+      ...REQUIRE,
+    },
+    positionals: ['pr'],
+  },
+  'wait-merge': {
+    help: 'Wait for a PR handed to automerge to merge, close or fail a required check, then say what to do next',
+    options: {
+      timeout: { kind: 'string', about: 'seconds to wait before giving up (default 540)' },
+      interval: { kind: 'string', about: 'seconds between reads (default 30)' },
       ...REQUIRE,
     },
     positionals: ['pr'],
@@ -607,6 +617,15 @@ async function main(argv: string[]): Promise<number> {
         args['reviewed-head'] as string | undefined,
       );
       break;
+    case 'wait-merge':
+      result = await waitMerge(
+        repo,
+        positional(0),
+        required,
+        Number(args.timeout ?? 540),
+        Number(args.interval ?? 30),
+      );
+      break;
     case 'gate': {
       const resolved = permission();
       result = {
@@ -689,7 +708,8 @@ async function main(argv: string[]): Promise<number> {
   if (
     (command === 'gate' && !status.allowed) ||
     (command === 'docs-check' && !(result as { ok?: boolean }).ok) ||
-    (command === 'run' && !['passed', 'reconciled'].includes(status.status ?? ''))
+    (command === 'run' && !['passed', 'reconciled'].includes(status.status ?? '')) ||
+    (command === 'wait-merge' && status.status !== 'merged')
   ) {
     return 1;
   }

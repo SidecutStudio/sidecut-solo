@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.41.3] - 2026-11-26
+
+### Fixed
+
+- A session that hands its PR to automerge (a merge label or GitHub auto-merge) can no longer end its turn and sit idle when the PR merges. In Claude Code and Codex, a new turn-guard hook refuses to end the turn until `solo wait-merge` is waiting on the PR. `solo wait-merge` returns when the PR merges, closes, loses its label and auto-merge, or fails a required check, and says what comes next. Opening the PR with the label, `gh issue edit` and commands run through `bash -lc`, `timeout` or `env` count as handoffs too. A Builder session had waited on the desktop app's CI watcher, which speaks up only on failures, and its production checks, staging journey and release sat undone for about two and a half hours.
+- Solo skills a brief names are now held to: the turn guard notes them and, when one never loaded, raises it once at the end of a turn. Orchestration says each named skill runs at its step. The same session loaded only the first of the three it was given.
+
 ## [0.41.2] - 2026-11-26
 
 ### Fixed

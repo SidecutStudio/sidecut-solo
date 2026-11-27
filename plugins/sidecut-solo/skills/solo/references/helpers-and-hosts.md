@@ -90,4 +90,6 @@ Without delegation, do a separate careful pass and label it same-agent. If a wor
 
 Where Solo settings exist, the merge guard refuses admin merges and any merge outside the helper that doesn't name a head with a clean saved review. Never rely on hooks as the merge boundary or merge with an admin override yourself.
 
+In Claude Code and Codex the turn guard refuses to end a turn while a PR this session handed to automerge is unmerged and no `solo wait-merge` waits on it, and raises once a skill the prompt named that never loaded.
+
 Check each host's active hook configuration and trust state. Installed files alone do not prove a hook ran.

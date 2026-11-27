@@ -20,6 +20,10 @@ For unfinished work, start with `solo-list-work` to establish ownership and prev
 
 For release inspection, check status and review outgoing changes without editing unless fixes are requested.
 
+## Named skills
+
+When the request names Solo skills, each one runs at its step: load it and follow its steps instead of doing that part from memory, then hand over to the next named one. The turn guard notes the skills a prompt names and, when one never loaded, raises it once at the end of a turn.
+
 ## Carry context
 
 Preserve the goal, exclusions, decisions, permission, task record and evidence across every handoff. Attach checks and reviews to their exact head or dirty-tree fingerprint.
