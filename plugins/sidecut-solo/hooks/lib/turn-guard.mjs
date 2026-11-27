@@ -259,25 +259,34 @@ const RELAYED = [
 const SLASH = /(?<![\w/.:-])\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/g;
 
 /**
- * Drops fenced code blocks. A fence with no closing line isn't stripped, so it can't swallow a
- * relayed block's close; a marker already seen unclosed isn't searched for again, which keeps this
- * linear.
+ * Drops fenced code blocks. A fence closes at the next line that is only a run of its character at
+ * least as long; a fence with no such line isn't stripped, so it can't swallow a relayed block's
+ * close. Only marker-only lines are searched, and a length already seen unclosed is skipped.
  */
 function stripFences(text) {
   const lines = text.split('\n');
+  const closers = { '`': [], '~': [] };
+  for (const [at, line] of lines.entries()) {
+    const run = /^[ \t]*(`{3,}|~{3,})[ \t]*\r?$/.exec(line)?.[1];
+    if (run) closers[run[0]].push([at, run.length]);
+  }
+  const next = { '`': 0, '~': 0 };
+  const unclosed = { '`': Infinity, '~': Infinity };
   const kept = [];
-  const unclosed = new Set();
   for (let i = 0; i < lines.length; i++) {
     // A backtick fence line holds no other backticks.
     const marker = /^[ \t]*(`{3,}(?!`)(?=[^`]*$)|~{3,}(?!~))/.exec(lines[i])?.[1];
-    if (marker && !unclosed.has(marker)) {
-      let end = i + 1;
-      while (end < lines.length && lines[end].trim() !== marker) end++;
-      if (end < lines.length) {
-        i = end;
+    const char = marker?.[0];
+    if (marker && marker.length < unclosed[char]) {
+      const list = closers[char];
+      while (next[char] < list.length && list[next[char]][0] <= i) next[char]++;
+      let found = next[char];
+      while (found < list.length && list[found][1] < marker.length) found++;
+      if (found < list.length) {
+        i = list[found][0];
         continue;
       }
-      unclosed.add(marker);
+      unclosed[char] = marker.length;
     }
     kept.push(lines[i]);
   }
@@ -287,7 +296,8 @@ function stripFences(text) {
 /** The prompt's own words: code, relayed blocks and quoted lines left out. */
 function ownWords(prompt) {
   // Code first, so a tag named inside code isn't read as a relayed block.
-  let text = stripFences(String(prompt)).replace(/`[^`\n]*`/g, ' ');
+  // Inline code closes at a run of the same number of backticks.
+  let text = stripFences(String(prompt)).replace(/(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)/g, ' ');
   for (const tag of RELAYED) {
     // A relayed block left open runs to the end of the prompt: what follows is still relayed.
     const open = `<\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
@@ -308,7 +318,9 @@ const isSkill = (name) => existsSync(join(SKILLS, name, 'SKILL.md'));
 export function namedSkills(prompt, host) {
   const text = String(prompt ?? '');
   const loaded = new Set();
+  // Claude Code expands a slash command that opens the prompt; Codex has no such command.
   const opener =
+    host !== 'codex' &&
     /^\s*(?:<command-name>\s*)?\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/.exec(text)?.[1];
   if (opener && isSkill(opener)) loaded.add(opener);
   if (host === 'codex')

@@ -641,6 +641,10 @@ describe('named skills', () => {
       '/sidecut-solo:solo-compare-plugin',
       '```',
       'Path skills/sidecut-solo:solo-diagnose-problem/SKILL.md',
+      'Double ``/sidecut-solo:solo-show-usage`` code, and a longer close:',
+      '```',
+      '/sidecut-solo:solo-list-work',
+      '````',
       '<task-notification>/sidecut-solo:solo-research-topic done',
     ].join('\n');
     hook(prompt(repo, quoted, 'q1'), home, 'UserPromptSubmit');
@@ -662,6 +666,16 @@ describe('named skills', () => {
     ].join('\n');
     hook(prompt(repo, text, 'a1'), home, 'UserPromptSubmit');
     expect(hook(stop(repo, 'a1'), home)?.reason).toContain('sidecut-solo:solo-deliver-change');
+  });
+
+  test('on Codex a slash command opening the prompt is still owed', () => {
+    const home = scratch();
+    const repo = scratch();
+    const codex = { ...prompt(repo, '/sidecut-solo:solo-review-code PR 32', 'o1'), turn_id: 't' };
+    hook(codex, home, 'UserPromptSubmit');
+    expect(hook({ ...stop(repo, 'o1'), turn_id: 't' }, home)?.reason).toContain(
+      'sidecut-solo:solo-review-code',
+    );
   });
 
   test('a `$` mention counts as loaded only on Codex', () => {
