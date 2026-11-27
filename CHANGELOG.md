@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.42.1] - 2026-11-27
+
+### Fixed
+
+- The turn guard now holds a session only to Solo skills the user asks for with an exact `/sidecut-solo:solo-x` slash command, and names each one that never loaded once, at the end of a turn, so the session can load it or say in one line why it didn't apply. Prose names no longer count, and neither do slash commands in quoted lines, code, another session's message, an agent message, a side-session event, a task notification, a CI event, pasted text or a prompt the host made itself. A slash command that opens a Claude Code prompt, or a `$` mention in Codex, is loaded by the host and counts as loaded. An orchestrating session was told it hadn't loaded `solo-test-behavior` because a peer's report quoted it, and a session was raised about a skill its brief kept for a later step.
+
 ## [0.42.0] - 2026-11-27
 
 ### Added

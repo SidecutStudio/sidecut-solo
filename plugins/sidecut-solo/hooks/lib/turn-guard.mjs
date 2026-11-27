@@ -9,9 +9,11 @@
 //   outside Solo, so it gets a record here and the session is sent to `solo automerge`, whose gates
 //   it skipped. A record is watched while the wait-merge that claimed it is alive and inside the
 //   wait it announced. Nothing here reads shell commands.
-// - UserPromptSubmit: the Solo skills a prompt names are noted for the session.
-// - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
-//   loaded is raised once.
+// - UserPromptSubmit: the Solo skills the user asks for with an exact `/sidecut-solo:solo-x` slash
+//   command are noted. Prose names, code, quotes and relayed text (another session's message, a task
+//   notification, pasted text) don't count, and a skill the host loads itself counts as loaded.
+// - PostToolUse: the Solo skills the session loads are noted, and at Stop each asked-for skill that
+//   never loaded is named once.
 //
 // Claude Code, Codex and Antigravity send different input shapes; `normal` reads all three. Session
 // notes live in ~/.sidecut/solo/sessions/. Any error lets the session carry on.
@@ -90,7 +92,7 @@ function isDir(path) {
 }
 
 /**
- * The hook input in one shape: { host, session, cwd, prompt, stopActive }. Antigravity sends
+ * The hook input in one shape: { host, session, cwd, prompt, source, stopActive }. Antigravity sends
  * camelCase fields and runs hooks from the plugin's folder, so its workspace stands in for cwd.
  */
 export function normal(input) {
@@ -109,6 +111,7 @@ export function normal(input) {
     session: String(input.session_id ?? ''),
     cwd: isDir(input.cwd) ? input.cwd : process.cwd(),
     prompt: input.prompt,
+    source: input.source,
     stopActive: Boolean(input.stop_hook_active),
   };
 }
@@ -243,14 +246,90 @@ function handoffReason(input) {
 
 // ---- Named skills -------------------------------------------------------------------------------
 
-/** Solo skills a prompt names, such as `solo-build-change` or `/sidecut-solo:solo-deliver-change`. */
-export function namedSkills(prompt) {
-  const found = new Set();
-  const pattern = /(?<![\w-])(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w-])/g;
-  for (const match of String(prompt).matchAll(pattern)) {
-    if (existsSync(join(SKILLS, match[1], 'SKILL.md'))) found.add(match[1]);
+// Text the host or another session relays into a prompt. Skills named there are someone else's.
+const RELAYED = [
+  'cross-session-message',
+  'agent-message',
+  'side-sessions-event',
+  'pasted_content',
+  'task-notification',
+  'ci-monitor-event',
+];
+// An exact `/sidecut-solo:solo-x` slash command, the one form that asks for a skill by name.
+const SLASH = /(?<![\w/.:-])\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/g;
+
+/**
+ * Drops fenced code blocks. A fence closes at the next line that is only a run of its character at
+ * least as long; a fence with no such line isn't stripped, so it can't swallow a relayed block's
+ * close. Only marker-only lines are searched, and a length already seen unclosed is skipped.
+ */
+function stripFences(text) {
+  const lines = text.split('\n');
+  const closers = { '`': [], '~': [] };
+  for (const [at, line] of lines.entries()) {
+    const run = /^[ \t]*(`{3,}|~{3,})[ \t]*\r?$/.exec(line)?.[1];
+    if (run) closers[run[0]].push([at, run.length]);
   }
-  return [...found];
+  const next = { '`': 0, '~': 0 };
+  const unclosed = { '`': Infinity, '~': Infinity };
+  const kept = [];
+  for (let i = 0; i < lines.length; i++) {
+    // A backtick fence line holds no other backticks.
+    const marker = /^[ \t]*(`{3,}(?!`)(?=[^`]*$)|~{3,}(?!~))/.exec(lines[i])?.[1];
+    const char = marker?.[0];
+    if (marker && marker.length < unclosed[char]) {
+      const list = closers[char];
+      while (next[char] < list.length && list[next[char]][0] <= i) next[char]++;
+      let found = next[char];
+      while (found < list.length && list[found][1] < marker.length) found++;
+      if (found < list.length) {
+        i = list[found][0];
+        continue;
+      }
+      unclosed[char] = marker.length;
+    }
+    kept.push(lines[i]);
+  }
+  return kept.join('\n');
+}
+
+/** The prompt's own words: code, relayed blocks and quoted lines left out. */
+function ownWords(prompt) {
+  // Code first, so a tag named inside code isn't read as a relayed block.
+  // Inline code closes at a run of the same number of backticks.
+  let text = stripFences(String(prompt)).replace(/(?<!`)(`+)(?!`)[^\n]*?(?<!`)\1(?!`)/g, ' ');
+  for (const tag of RELAYED) {
+    // A relayed block left open runs to the end of the prompt: what follows is still relayed.
+    const open = `<\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
+    const close = `<\\/\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
+    text = text.replace(new RegExp(`${open}[\\s\\S]*?(?:${close}|$)`, 'gi'), '\n');
+  }
+  return text.replace(/^[ \t]*>.*$/gm, '');
+}
+
+const isSkill = (name) => existsSync(join(SKILLS, name, 'SKILL.md'));
+
+/**
+ * The Solo skills a prompt asks for with a slash command, split by whether the host already loaded
+ * them. Claude Code expands a slash command that opens the prompt and Codex injects a `$` mention,
+ * so those are loaded; any other `/sidecut-solo:solo-x` in the user's own words is still owed.
+ * Prose names, code, quotes and relayed text never count.
+ */
+export function namedSkills(prompt, host) {
+  const text = String(prompt ?? '');
+  const loaded = new Set();
+  // Claude Code expands a slash command that opens the prompt; Codex has no such command.
+  const opener =
+    host !== 'codex' &&
+    /^\s*(?:<command-name>\s*)?\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/.exec(text)?.[1];
+  if (opener && isSkill(opener)) loaded.add(opener);
+  if (host === 'codex')
+    for (const [, name] of text.matchAll(/(?<![\w$])\$sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)/g))
+      if (isSkill(name)) loaded.add(name);
+  const named = new Set();
+  for (const [, name] of ownWords(text).matchAll(SLASH))
+    if (!loaded.has(name) && isSkill(name)) named.add(name);
+  return { named: [...named], loaded: [...loaded] };
 }
 
 /**
@@ -280,13 +359,16 @@ function noteSession(id, change) {
   writeJson(path, notes);
 }
 
-/** UserPromptSubmit: note named skills, and give a new prompt fresh refusals for open handoffs. */
+/** UserPromptSubmit: note slash-command skills, and give a new prompt fresh refusals for open handoffs. */
 export function notePrompt(raw) {
   const input = normal(raw);
-  const named = namedSkills(input.prompt ?? '');
-  if (named.length)
+  // Claude Code marks prompts it makes itself (a wake-up, a schedule); only the user's count.
+  const own = !input.source || input.source === 'user';
+  const { named, loaded } = own ? namedSkills(input.prompt, input.host) : { named: [], loaded: [] };
+  if (named.length || loaded.length)
     noteSession(input.session, (notes) => {
       notes.named = [...new Set([...(notes.named ?? []), ...named])];
+      notes.loaded = [...new Set([...(notes.loaded ?? []), ...loaded])];
     });
   for (const [path, record] of ownHandoffs(input, place(input.cwd)))
     if (record.blocks) {
@@ -315,7 +397,7 @@ function namedReason(input) {
   if (!missing.length) return '';
   writeJson(path, { ...notes, raised: [...(notes.raised ?? []), ...missing] });
   const list = missing.map((name) => `${PLUGIN}:${name}`).join(', ');
-  return `The task named ${list}, and this session hasn't loaded ${missing.length > 1 ? 'them' : 'it'}. Hand over to each named skill at its step: load it (the Skill tool, or read its SKILL.md where the host has none) and follow its steps instead of doing that part from memory. If a named skill's step has come, load it now. If its step is still ahead, or the user dropped it, say so in one line and carry on.`;
+  return `You asked for ${list} with a slash command, and this session hasn't loaded ${missing.length > 1 ? 'them' : 'it'}. Load each one whose step is still to do (the Skill tool, or read its SKILL.md where the host has none) and follow it. For one that didn't apply, say why in one line. This reminder won't repeat.`;
 }
 
 /** Drops session notes older than a week so the folder doesn't grow forever. */

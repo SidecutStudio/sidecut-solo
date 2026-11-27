@@ -22,7 +22,7 @@ For release inspection, check status and review outgoing changes without editing
 
 ## Named skills
 
-When the request names Solo skills, each one runs at its step: load it and follow its steps instead of doing that part from memory, then hand over to the next named one. The turn guard notes the skills a prompt names and, when one never loaded, raises it once at the end of a turn.
+When the request names Solo skills, each one runs at its step: load it and follow its steps instead of doing that part from memory, then hand over to the next named one. The turn guard notes the skills the user asks for with a `/sidecut-solo:solo-x` slash command and, when one never loaded, names it once at the end of a turn; for a step that didn't apply, say why in one line.
 
 ## Carry context
 

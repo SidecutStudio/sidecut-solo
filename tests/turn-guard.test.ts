@@ -591,43 +591,135 @@ describe('solo automerge and wait-merge', () => {
 });
 
 describe('named skills', () => {
-  test('a brief naming three skills raises the two that never loaded, once', () => {
+  const skillTool = (session: string, repo: string, skill: string) => ({
+    hook_event_name: 'PostToolUse',
+    session_id: session,
+    cwd: repo,
+    tool_name: 'Skill',
+    tool_input: { skill: `sidecut-solo:${skill}` },
+  });
+
+  test('a slash-command ask that never loaded gets one reminder', () => {
     const home = scratch();
     const repo = scratch();
-    mkdirSync(join(repo, 'x'));
-    const brief =
-      'Plan with `solo-plan-change`, build with `solo-build-change`, and deliver through `sidecut-solo:solo-deliver-change`. Not solo-made-up.';
-    hook(prompt(repo, brief), home, 'UserPromptSubmit');
-    hook(
-      {
-        hook_event_name: 'PostToolUse',
-        session_id: 's1',
-        cwd: repo,
-        tool_name: 'Skill',
-        tool_input: { skill: 'sidecut-solo:solo-plan-change' },
-      },
-      home,
-      'PostToolUse',
-    );
+    const ask =
+      'Fix the hook, then /sidecut-solo:solo-review-code and /sidecut-solo:solo-deliver-change. Also /sidecut-solo:solo-plan-change and /sidecut-solo:solo-made-up.';
+    hook(prompt(repo, ask), home, 'UserPromptSubmit');
+    hook(skillTool('s1', repo, 'solo-plan-change'), home, 'PostToolUse');
     const raised = hook(stop(repo), home);
     expect(raised?.decision).toBe('block');
     expect(raised?.reason).toContain(
-      'sidecut-solo:solo-build-change, sidecut-solo:solo-deliver-change',
+      'sidecut-solo:solo-review-code, sidecut-solo:solo-deliver-change',
     );
     expect(raised?.reason).not.toContain('solo-plan-change');
     expect(raised?.reason).not.toContain('made-up');
     expect(hook(stop(repo), home)).toBeNull();
   });
 
-  test('a brief whose named skills all loaded ends the turn quietly', () => {
+  test('prose names in a brief never trigger it', () => {
     const home = scratch();
     const repo = scratch();
-    hook(prompt(repo, 'Use solo-review-code.', 's2'), home, 'UserPromptSubmit');
-    // Codex reads the skill with a shell command instead of a Skill tool.
+    const brief =
+      'Plan with `solo-plan-change`, build with solo-build-change and deliver through sidecut-solo:solo-deliver-change. Next steps: /solo-test-behavior.';
+    hook(prompt(repo, brief, 'b1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'b1'), home)).toBeNull();
+  });
+
+  test('slash commands in quotes, code or relayed text never trigger it', () => {
+    const home = scratch();
+    const repo = scratch();
+    const quoted = [
+      'Thanks, carry on.',
+      '<cross-session-message from="local_x">Ran /sidecut-solo:solo-test-behavior; green.</cross-session-message>',
+      '<~agent-message>/sidecut-solo:solo-review-code</~agent-message>',
+      '<side-sessions-event>/sidecut-solo:solo-plan-change finished</side-sessions-event>',
+      // Claude Code's own paste shape: the closing tag repeats the id.
+      '<pasted_content id="p1">\nRun /sidecut-solo:solo-deliver-change now.\n</pasted_content id="p1">',
+      '> Earlier: /sidecut-solo:solo-write-copy',
+      'Compare `/sidecut-solo:solo-build-change` with:',
+      '```',
+      '/sidecut-solo:solo-compare-plugin',
+      '```',
+      'Path skills/sidecut-solo:solo-diagnose-problem/SKILL.md',
+      'Double ``/sidecut-solo:solo-show-usage`` code, and a longer close:',
+      '```',
+      '/sidecut-solo:solo-list-work',
+      '````',
+      '<task-notification>/sidecut-solo:solo-research-topic done',
+    ].join('\n');
+    hook(prompt(repo, quoted, 'q1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'q1'), home)).toBeNull();
+  });
+
+  test('own words after a paste or a truncated relayed report still count', () => {
+    const home = scratch();
+    const repo = scratch();
+    const text = [
+      '<pasted_content id="p1">',
+      'error log',
+      '</pasted_content id="p1">',
+      '<agent-message>',
+      '```',
+      'log cut off',
+      '</agent-message>',
+      'Fix it, then /sidecut-solo:solo-deliver-change',
+    ].join('\n');
+    hook(prompt(repo, text, 'a1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'a1'), home)?.reason).toContain('sidecut-solo:solo-deliver-change');
+  });
+
+  test('on Codex a slash command opening the prompt is still owed', () => {
+    const home = scratch();
+    const repo = scratch();
+    const codex = { ...prompt(repo, '/sidecut-solo:solo-review-code PR 32', 'o1'), turn_id: 't' };
+    hook(codex, home, 'UserPromptSubmit');
+    expect(hook({ ...stop(repo, 'o1'), turn_id: 't' }, home)?.reason).toContain(
+      'sidecut-solo:solo-review-code',
+    );
+  });
+
+  test('a `$` mention counts as loaded only on Codex', () => {
+    const home = scratch();
+    const repo = scratch();
+    hook(
+      prompt(repo, 'They said use $sidecut-solo:solo-review-code', 'm1'),
+      home,
+      'UserPromptSubmit',
+    );
+    hook(prompt(repo, 'Now /sidecut-solo:solo-review-code', 'm1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'm1'), home)?.reason).toContain('sidecut-solo:solo-review-code');
+  });
+
+  test('a skill the host loads itself, or a prompt the host made, needs no reminder', () => {
+    const home = scratch();
+    const repo = scratch();
+    // Claude Code expands a slash command that opens the prompt; Codex injects a `$` mention.
+    hook(prompt(repo, '/sidecut-solo:solo-review-code PR 31', 'h1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'h1'), home)).toBeNull();
+    const codex = {
+      ...prompt(repo, 'Run $sidecut-solo:solo-test-behavior on it', 'h2'),
+      turn_id: 't',
+    };
+    hook(codex, home, 'UserPromptSubmit');
+    expect(hook({ ...stop(repo, 'h2'), turn_id: 't' }, home)).toBeNull();
+    const wakeup = {
+      ...prompt(repo, 'Then /sidecut-solo:solo-deliver-change', 'h3'),
+      source: 'loop_wakeup',
+    };
+    hook(wakeup, home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'h3'), home)).toBeNull();
+  });
+
+  test('Codex raises an owed slash command the same way, and a read SKILL.md counts as loaded', () => {
+    const home = scratch();
+    const repo = scratch();
+    const ask =
+      'Review it, then /sidecut-solo:solo-review-code and /sidecut-solo:solo-deliver-change.';
+    hook({ ...prompt(repo, ask, 'c1'), turn_id: 't' }, home, 'UserPromptSubmit');
     hook(
       {
         hook_event_name: 'PostToolUse',
-        session_id: 's2',
+        session_id: 'c1',
         turn_id: 't',
         cwd: repo,
         tool_name: 'Bash',
@@ -638,6 +730,24 @@ describe('named skills', () => {
       home,
       'PostToolUse',
     );
-    expect(hook(stop(repo, 's2'), home)).toBeNull();
+    const raised = hook({ ...stop(repo, 'c1'), turn_id: 't' }, home);
+    expect(raised?.decision).toBe('block');
+    expect(raised?.reason).toContain('sidecut-solo:solo-deliver-change');
+    expect(raised?.reason).not.toContain('solo-review-code');
+  });
+
+  test('a huge run of one character is read quickly', () => {
+    const home = scratch();
+    const repo = scratch();
+    for (const text of [
+      '`'.repeat(200_000),
+      ' '.repeat(200_000),
+      '<agent-message '.repeat(20_000),
+      '```x\n'.repeat(50_000),
+    ]) {
+      const started = Date.now();
+      hook(prompt(repo, text, 'p1'), home, 'UserPromptSubmit');
+      expect(Date.now() - started).toBeLessThan(3000);
+    }
   });
 });
