@@ -2121,7 +2121,8 @@ var KEYS = {
   review: "string",
   review_model: "string",
   codex_review_model: "string",
-  review_effort: "string"
+  review_effort: "string",
+  deep_review_rounds: "number"
 };
 var DEFAULTS = {
   merge: "ask",
@@ -2129,7 +2130,8 @@ var DEFAULTS = {
   worktrees: "when-overlapping",
   review: "auto",
   review_model: "sonnet",
-  review_effort: "medium"
+  review_effort: "medium",
+  deep_review_rounds: 3
 };
 var CHOICES = {
   merge: MERGE_POLICIES,
@@ -2140,6 +2142,7 @@ var CHOICES = {
 };
 function kindOf(value) {
   if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
   if (Array.isArray(value)) return "list";
   if (value && typeof value === "object" && [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
     return "table";
@@ -2156,6 +2159,8 @@ function problems(data, name) {
       found.push([key, `${name}: '${key}' must be one of ${CHOICES[key].join(", ")}`]);
     } else if (key === "checks" && !Object.values(value).every((v) => typeof v === "string")) {
       found.push([key, `${name}: every [checks] entry must be a command string`]);
+    } else if (kind === "number" && !(Number.isInteger(value) && value >= 1)) {
+      found.push([key, `${name}: '${key}' must be a whole number of at least 1`]);
     } else if (kind === "list" && !value.every((v) => typeof v === "string")) {
       found.push([key, `${name}: '${key}' must list strings`]);
     }
@@ -2678,6 +2683,8 @@ function shellQuote(value) {
 
 // plugins/sidecut-solo/server/src/helper/lib/reviews.ts
 var REVIEWERS = ["same-agent", "independent", "user"];
+var REVIEW_LEVELS = ["light", "standard", "deep"];
+var REVIEW_SCOPES = ["whole", "fix-diff"];
 var FULL_SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 function reviewProblems(review) {
   const reasons = [];
@@ -2696,24 +2703,50 @@ function reviewProblems(review) {
 function reviewDir(repo) {
   return join7(commonDir(repo), "solo-reviews");
 }
-function saveReview(repo, review) {
+function saveReview(repo, review, cap = 3, base, asked = true) {
   const head = review.head ?? "";
   if (!FULL_SHA.test(head))
     throw new WorkflowError("review: --reviewed-head must be the full commit SHA you reviewed");
   if (gitRun(repo, ["cat-file", "-e", `${head}^{commit}`]).code)
     throw new WorkflowError(`review: ${head} is not a commit in this repository; fetch it first`);
   const problems2 = reviewProblems(review).filter((reason) => !/unresolved blocking/.test(reason));
+  if (asked && !REVIEW_LEVELS.includes(review.level ?? ""))
+    problems2.push("review must state its level (--level light, standard or deep)");
+  const scope = review.scope ?? "whole";
+  if (!REVIEW_SCOPES.includes(scope))
+    problems2.push("--scope must be whole or fix-diff");
   if (problems2.length) throw new WorkflowError(`review: ${problems2.join("; ")}`);
+  const below = reviewsBelow(repo, head, base);
+  if (asked && scope === "fix-diff") {
+    const last = below[0];
+    if (last?.review.blocking_findings !== 0)
+      throw new WorkflowError(
+        last ? `review: the review of ${last.head.slice(0, 12)} left ${String(last.review.blocking_findings)} blocker or major findings, so this head needs a review of the whole change (--scope whole)` : "review: no earlier review of this change is saved, so this head needs a review of the whole change (--scope whole)"
+      );
+  }
+  let round;
+  if (asked && review.level === "deep" && scope === "whole") {
+    const done = below.filter(
+      (item) => item.review.level === "deep" && (item.review.scope ?? "whole") === "whole"
+    ).length;
+    if (done >= cap)
+      throw new WorkflowError(
+        `review: this change has had ${done} deep review rounds, the most deep_review_rounds allows (${cap}). Don't review it again: stop and report to the owner with two choices, rethink the design or accept the remaining minor findings. If they accept them, fix what they choose and review only that fix diff (--scope fix-diff)`
+      );
+    round = done + 1;
+  }
   const record = {
     head,
     reviewer: review.reviewer,
     blocking_findings: review.blocking_findings,
     notes: review.notes,
+    ...review.level ? { level: review.level, scope } : {},
+    ...round ? { deep_round: round } : {},
     at: now()
   };
   const path = join7(reviewDir(repo), `${head}.json`);
   atomicJson(path, record);
-  return { path, review: record };
+  return { path, review: record, ...round ? { deep_rounds: { used: round, cap } } : {} };
 }
 function loadReview(repo, head) {
   if (!FULL_SHA.test(head)) return void 0;
@@ -2731,21 +2764,26 @@ function commitsAfter(repo, reviewed, head) {
   const count2 = gitRun(repo, ["rev-list", "--count", `${reviewed}..${head}`]);
   return count2.code ? void 0 : Number(count2.stdout.trim());
 }
-function lastReviewedBefore(repo, head, base) {
+function reviewsBelow(repo, head, base) {
   const dir = reviewDir(repo);
-  if (!existsSync7(dir)) return void 0;
+  if (!existsSync7(dir)) return [];
   const baseRefs = base ? [`refs/remotes/origin/${base}`, `refs/heads/${base}`].filter(
     (ref) => !gitRun(repo, ["rev-parse", "--verify", "--quiet", ref]).code
   ) : [];
-  let best;
+  const found = [];
   for (const name of readdirSync5(dir)) {
     const sha = name.replace(/\.json$/, "");
     if (baseRefs.some((ref) => !gitRun(repo, ["merge-base", "--is-ancestor", sha, ref]).code))
       continue;
     const after = commitsAfter(repo, sha, head);
-    if (after !== void 0 && (!best || after < best.after)) best = { head: sha, after };
+    const review = after === void 0 ? void 0 : loadReview(repo, sha);
+    if (after !== void 0 && review) found.push({ head: sha, after, review });
   }
-  return best;
+  return found.sort((a, b) => a.after - b.after);
+}
+function lastReviewedBefore(repo, head, base) {
+  const nearest = reviewsBelow(repo, head, base)[0];
+  return nearest && { head: nearest.head, after: nearest.after };
 }
 function unreviewedCommits(reviewed, after, head) {
   const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
@@ -3169,7 +3207,7 @@ function merge(store, pr, authorized, review, method = "squash", require2 = [], 
     }
     Object.assign(intent, { status: "verified", after });
     try {
-      saveReview(store.repo, review);
+      saveReview(store.repo, review, Number.POSITIVE_INFINITY, void 0, false);
     } catch {
     }
     data.merge_history = [...data.merge_history ?? [], intent];
@@ -3914,20 +3952,14 @@ async function run(store, key, argv, timeout = 120) {
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/handoff.ts
-import { existsSync as existsSync11, readdirSync as readdirSync8, readFileSync as readFileSync9, rmSync as rmSync2 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync9, rmSync as rmSync2 } from "node:fs";
 import { join as join11 } from "node:path";
-function handoffDir(repo) {
-  return join11(commonDir(repo), "solo-handoffs");
-}
+var GRACE_MS = 6e4;
 function prNumber(pr) {
   return /([1-9][0-9]*)$/.exec(pr)?.[1] ?? pr;
 }
-function recordsFor(repo, pr, branch) {
-  const dir = handoffDir(repo);
-  if (!existsSync11(dir)) return [];
-  const keys = /* @__PURE__ */ new Set([`pr-${prNumber(pr)}.json`]);
-  if (branch) keys.add(`branch-${branch.replace(/[^\w.-]/g, "_")}.json`);
-  return readdirSync8(dir).filter((name) => keys.has(name)).map((name) => join11(dir, name));
+function recordPath(repo, pr) {
+  return join11(commonDir(repo), "solo-handoffs", `pr-${prNumber(pr)}.json`);
 }
 function read(path) {
   try {
@@ -3949,24 +3981,17 @@ function handedOff(repo, pr) {
 }
 var sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
-  if (!/^[1-9][0-9]*$/.test(pr) && !/^https:\/\/[^\s]+\/pull\/[1-9][0-9]*$/.test(pr))
-    throw new WorkflowError("PR must be a positive number or an HTTPS pull-request URL");
+  validatePr(pr);
   if (!(timeoutS > 0) || !(intervalS > 0))
     throw new WorkflowError("--timeout and --interval must be positive numbers of seconds");
-  const mine = join11(handoffDir(repo), `pr-${prNumber(pr)}.json`);
-  const claim = (paths) => {
-    const all = [.../* @__PURE__ */ new Set([mine, ...paths])];
-    const session = all.map((path) => read(path).session).find(Boolean);
-    for (const path of all)
-      atomicJson(path, {
-        ...read(path),
-        ...session ? { session } : {},
-        ref: prNumber(pr),
-        waiter: { pid: process.pid, at: now() }
-      });
-  };
-  claim([]);
+  const path = recordPath(repo, pr);
   const deadline = Date.now() + timeoutS * 1e3;
+  atomicJson(path, {
+    ...read(path),
+    ref: prNumber(pr),
+    waiter: { pid: process.pid, at: now(), until: new Date(deadline + GRACE_MS).toISOString() }
+  });
+  const done = () => rmSync2(path, { force: true });
   let result;
   try {
     while (!result) {
@@ -3979,10 +4004,9 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
         continue;
       }
       const view = seen.pr;
-      claim(recordsFor(repo, pr, view.headRefName));
       const base = { pr: prNumber(pr), head: seen.head };
       if (view.state === "MERGED") {
-        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        done();
         result = {
           ...base,
           status: "merged",
@@ -3990,18 +4014,18 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
           next: "Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup."
         };
       } else if (view.state === "CLOSED") {
-        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        done();
         result = {
           ...base,
           status: "closed",
           next: "The PR was closed without merging. Find out why before doing anything else with it."
         };
       } else if (!handedOff(repo, pr)) {
-        for (const path of recordsFor(repo, pr, view.headRefName)) rmSync2(path, { force: true });
+        done();
         result = {
           ...base,
           status: "not-handed-off",
-          next: "Nothing will merge it: the PR has no merge label and no auto-merge. Merge through solo merge, or hand it off again and wait."
+          next: "Nothing will merge it: the PR has no merge label and no auto-merge. Merge through solo merge, or hand it off with solo automerge."
         };
       } else {
         const failed = seen.required_checks.filter((check) => ["fail", "cancel"].includes(String(check.bucket))).map((check) => String(check.name));
@@ -4022,8 +4046,7 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
       }
     }
   } finally {
-    for (const path of [mine, ...readdirSafe(repo)]) {
-      if (!existsSync11(path)) continue;
+    if (existsSync11(path)) {
       const record = read(path);
       if (record.waiter?.pid === process.pid) {
         delete record.waiter;
@@ -4033,9 +4056,82 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
   }
   return result;
 }
-function readdirSafe(repo) {
-  const dir = handoffDir(repo);
-  return existsSync11(dir) ? readdirSync8(dir).map((name) => join11(dir, name)) : [];
+async function automerge(repo, pr, options) {
+  validatePr(pr);
+  if (options.label !== void 0 && !MERGE_LABEL.test(options.label))
+    throw new WorkflowError(
+      `automerge: ${options.label} doesn't look like a merge label (automerge, auto-merge); the turn guard reads only those`
+    );
+  const reasons = [...options.problems];
+  const seen = collectChecks(repo, pr, options.require);
+  const view = seen.pr;
+  if (view.state !== "OPEN") reasons.push(`PR ${pr} is ${String(view.state).toLowerCase()}`);
+  const review = loadReview(repo, seen.head);
+  if (!review) {
+    const below = lastReviewedBefore(repo, seen.head, options.base);
+    reasons.push(
+      below ? unreviewedCommits(below.head, below.after, seen.head) : `no review is saved for the PR head ${seen.head}: review it and record it with \`solo review --reviewed-head ${seen.head}\``
+    );
+  } else reasons.push(...reviewProblems(review));
+  const failed = seen.required_checks.filter((check) => ["fail", "cancel"].includes(String(check.bucket))).map((check) => String(check.name));
+  if (failed.length) reasons.push(`required checks failed: ${failed.join(", ")}`);
+  if (reasons.length) throw new WorkflowError(`Automerge blocked: ${reasons.join("; ")}`);
+  const api = prApi(pr);
+  const number = prNumber(pr);
+  const made = options.label ? (
+    // REST, not GraphQL, which some hosts refuse.
+    spawn(
+      [
+        "gh",
+        "api",
+        ...api.host,
+        "--method",
+        "POST",
+        `${api.repoPath}/issues/${number}/labels`,
+        "-f",
+        `labels[]=${options.label}`
+      ],
+      repo
+    )
+  ) : spawn(
+    [
+      "gh",
+      "pr",
+      "merge",
+      pr,
+      "--auto",
+      `--${options.method}`,
+      "--match-head-commit",
+      seen.head
+    ],
+    repo
+  );
+  if (made.code)
+    throw new WorkflowError(
+      `automerge: GitHub refused the handoff: ${(made.stderr || made.stdout).trim().slice(0, 400)}`
+    );
+  const path = recordPath(repo, pr);
+  const via = options.label ? `label ${options.label}` : "auto-merge";
+  atomicJson(path, {
+    ...read(path),
+    ref: number,
+    head: seen.head,
+    via,
+    worktree: git(repo, ["rev-parse", "--show-toplevel"]),
+    at: now(),
+    blocks: 0
+  });
+  const handed = { pr: number, head: seen.head, via };
+  if (!options.wait)
+    return {
+      ...handed,
+      status: "handed-off",
+      next: `Run solo wait-merge ${number} now; the turn guard holds the turn until something waits on it.`
+    };
+  return {
+    ...handed,
+    ...await waitMerge(repo, pr, options.require, options.timeoutS, options.intervalS)
+  };
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/qa.ts
@@ -4432,11 +4528,17 @@ var COMMANDS = {
     }
   },
   review: {
-    help: "Save the review of one commit, which merge and the merge guard read",
+    help: "Save the review of one commit, which merge and automerge read; refuses a deep round past deep_review_rounds",
     options: {
       "reviewed-head": { kind: "string", required: true, about: "full SHA the review covered" },
       reviewer: { kind: "string", required: true, choices: ["same-agent", "independent", "user"] },
       "review-notes": { kind: "string", required: true, about: "what was reviewed and found" },
+      level: { kind: "string", required: true, choices: REVIEW_LEVELS },
+      scope: {
+        kind: "string",
+        choices: REVIEW_SCOPES,
+        about: "whole change (default) or only the fix diff since the last review"
+      },
       "blocking-findings": {
         kind: "string",
         required: true,
@@ -4465,6 +4567,22 @@ var COMMANDS = {
         about: "unresolved blocker or major findings; required inline"
       },
       method: { kind: "string", choices: MERGE_METHODS },
+      ...AUTHORIZATION,
+      ...REQUIRE
+    },
+    positionals: ["pr"]
+  },
+  automerge: {
+    help: "Hand the PR to automerge once its head has a clean saved review, record it and wait for the merge",
+    options: {
+      label: {
+        kind: "string",
+        about: "merge label a workflow acts on, such as automerge; without it, GitHub auto-merge"
+      },
+      method: { kind: "string", choices: MERGE_METHODS },
+      "no-wait": { kind: "flag", about: "hand off and return; run wait-merge next" },
+      timeout: { kind: "string", about: "seconds to wait before giving up (default 540)" },
+      interval: { kind: "string", about: "seconds between reads (default 30)" },
       ...AUTHORIZATION,
       ...REQUIRE
     },
@@ -4686,10 +4804,10 @@ function brief(repo, settings) {
   const checks = settings.required_checks?.length ? settings.required_checks.join(", ") : "the base branch's protection rules";
   const policy = settings.merge ?? DEFAULTS.merge;
   return [
-    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
-    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never a raw gh merge, auto-merge or merge label: in this repo the merge guard refuses gh merges and the turn guard catches a handoff made outside it.`,
+    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --level light|standard|deep --review-notes <text> --blocking-findings <n>\` (\`--scope fix-diff\` for a review of only the fix after a review that left no blocker or major findings). Any commit after it, a fix included, needs its own review first. After ${settings.deep_review_rounds ?? DEFAULTS.deep_review_rounds} deep rounds the helper refuses another: stop and report to the owner.`,
     `Run \`solo checks <pr> --reviewed-head <full sha>\`: every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
-    `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
+    `Merge with \`solo merge <pr>\`, or hand it to automerge with \`solo automerge <pr>\` (merge policy: ${policy}; merge refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
     "Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.",
     `Repo: ${repo}`
   ].join(" ");
@@ -4734,7 +4852,7 @@ async function main(argv) {
   const explicitTask = leading.task ?? later.task;
   const loaded = load(repo);
   const settings = loaded.config;
-  if (loaded.problems.length && ["checks", "merge", "gate", "authorization"].includes(command)) {
+  if (loaded.problems.length && ["checks", "merge", "automerge", "gate", "authorization", "review"].includes(command)) {
     throw new WorkflowError(`fix Sidecut Solo settings first: ${loaded.problems.join("; ")}`);
   }
   const required = [
@@ -4749,6 +4867,24 @@ async function main(argv) {
     publicationEffect: args["publication-effect"] ?? "unknown",
     hostScope: args["host-scope"] ?? "unknown"
   });
+  const mergeProblems = (resolved) => {
+    if (resolved.merge_vetoed)
+      throw new WorkflowError('repo settings set merge = "never"; configuration veto');
+    const problems2 = [];
+    if (resolved.missing_user_authorizations.includes("merge"))
+      problems2.push("the user has not allowed this merge (--authorized)");
+    if (resolved.missing_user_authorizations.includes("publication"))
+      problems2.push(
+        "merging publishes a release the user has not allowed (--publication-authorized)"
+      );
+    if (resolved.publication_effect === "unknown")
+      problems2.push("inspect what merging triggers first (--publication-effect none or automatic)");
+    if (resolved.host_scope !== "allowed")
+      problems2.push(
+        `host permission scope is ${resolved.host_scope.replace("_", " ")}; use the native tool approval flow (--host-scope)`
+      );
+    return problems2;
+  };
   const positional = (index) => args._[index];
   let result;
   switch (command) {
@@ -4842,7 +4978,16 @@ Dashboard saved to ${args.html}`);
       result = retiredNames(repo);
       break;
     case "review":
-      result = saveReview(repo, inlineReview(args));
+      result = saveReview(
+        repo,
+        {
+          ...inlineReview(args),
+          level: args.level,
+          scope: args.scope
+        },
+        settings.deep_review_rounds ?? DEFAULTS.deep_review_rounds,
+        settings.base_branch
+      );
       break;
     case "brief":
       process.stdout.write(`${brief(repo, settings)}
@@ -4855,6 +5000,18 @@ Dashboard saved to ${args.html}`);
         required,
         args["reviewed-head"]
       );
+      break;
+    case "automerge":
+      result = await automerge(repo, positional(0), {
+        label: args.label,
+        method: args.method ?? settings.merge_method ?? DEFAULTS.merge_method,
+        problems: mergeProblems(permission()),
+        require: required,
+        base: settings.base_branch,
+        wait: !args["no-wait"],
+        timeoutS: Number(args.timeout ?? 540),
+        intervalS: Number(args.interval ?? 30)
+      });
       break;
     case "wait-merge":
       result = await waitMerge(
@@ -4897,23 +5054,7 @@ Dashboard saved to ${args.html}`);
       } else if (command === "merge") {
         const review = reviewFrom(args, repo, settings.base_branch);
         const resolved = permission();
-        if (resolved.merge_vetoed)
-          throw new WorkflowError('repo settings set merge = "never"; configuration veto');
-        const problems2 = [];
-        if (resolved.missing_user_authorizations.includes("merge"))
-          problems2.push("the user has not allowed this merge (--authorized)");
-        if (resolved.missing_user_authorizations.includes("publication"))
-          problems2.push(
-            "merging publishes a release the user has not allowed (--publication-authorized)"
-          );
-        if (resolved.publication_effect === "unknown")
-          problems2.push(
-            "inspect what merging triggers first (--publication-effect none or automatic)"
-          );
-        if (resolved.host_scope !== "allowed")
-          problems2.push(
-            `host permission scope is ${resolved.host_scope.replace("_", " ")}; use the native tool approval flow (--host-scope)`
-          );
+        const problems2 = mergeProblems(resolved);
         if (!store.exists()) {
           const open = store.openElsewhere();
           if (open.length)
@@ -4940,7 +5081,7 @@ Dashboard saved to ${args.html}`);
   }
   console.log(JSON.stringify(result, null, 2));
   const status = result ?? {};
-  if (command === "gate" && !status.allowed || command === "docs-check" && !result.ok || command === "run" && !["passed", "reconciled"].includes(status.status ?? "") || command === "wait-merge" && status.status !== "merged") {
+  if (command === "gate" && !status.allowed || command === "docs-check" && !result.ok || command === "run" && !["passed", "reconciled"].includes(status.status ?? "") || command === "wait-merge" && status.status !== "merged" || command === "automerge" && !["merged", "handed-off"].includes(status.status ?? "")) {
     return 1;
   }
   return 0;

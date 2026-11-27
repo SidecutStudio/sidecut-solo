@@ -28,7 +28,7 @@
     "yaml": "2.9.1",
     "zod": "4.6.7"
   },
-  "version": "0.41.4",
+  "version": "0.42.0",
   "sidecut": {
     "keep": {
       "knip.json": "Knip's settings for the unused-code step in npm run check.",
@@ -37,7 +37,8 @@
       "REPO_SYNC .gitignore": "Solo tracks its own Codex agent profiles in .codex/agents/, so its .gitignore leaves out the template's .codex/agents/ line.",
       "dogfood": "Scrubbed example records; the saved runs are in the private sidecut-solo-dogfood repo.",
       "REPO_SYNC scripts/release.ts": "The pinned Sidecut Agentskills workflow supplies the shared release publisher.",
-      "REPO_SYNC plugins/sidecut-solo/server/data/user-input.md": "Adds Gemini/Antigravity's ask_question guidance until the shared sidecut-agentskills template includes it."
+      "REPO_SYNC plugins/sidecut-solo/server/data/user-input.md": "Adds Gemini/Antigravity's ask_question guidance until the shared sidecut-agentskills template includes it.",
+      "ANTIGRAVITY_SYNC plugins/sidecut-solo/hooks.json": "Registers the merge guard and the turn guard Stop hook for Antigravity until the shared sidecut-agentskills sync maps PreToolUse and Stop hooks."
     }
   },
   "engines": {

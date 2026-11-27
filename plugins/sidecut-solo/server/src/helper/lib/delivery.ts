@@ -172,7 +172,7 @@ export function deleteMerged(repo: string, into: string, names: string[]) {
   return { into, deleted, cleanup_errors: cleanupErrors, pr_lookup: result.pr_lookup };
 }
 
-function validatePr(pr: string): void {
+export function validatePr(pr: string): void {
   if (
     !/^[1-9][0-9]*$/.test(pr) &&
     !/^https:\/\/[a-zA-Z0-9.-]+\/[\w.-]+\/[\w.-]+\/pull\/[1-9][0-9]*$/.test(pr)
@@ -182,7 +182,7 @@ function validatePr(pr: string): void {
 }
 
 /** The `gh api` arguments for a PR given as a number (this repo) or an HTTPS URL. */
-function prApi(pr: string): { host: string[]; repoPath: string; prPath: string } {
+export function prApi(pr: string): { host: string[]; repoPath: string; prPath: string } {
   const url = pr.match(/^https:\/\/([^/]+)\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)$/);
   const repoPath = url ? `repos/${url[2]}/${url[3]}` : 'repos/{owner}/{repo}';
   const hostname = url?.[1];
@@ -578,7 +578,7 @@ export function merge(
     // The merge is the review record's proof of use; keep one for this head either way.
     // The saved record says what this merge relied on, even if an older one was there.
     try {
-      saveReview(store.repo, review);
+      saveReview(store.repo, review, Number.POSITIVE_INFINITY, undefined, false);
     } catch {}
     // A verified merge is finished history; only started/uncertain intents block a new merge.
     data.merge_history = [...(data.merge_history ?? []), intent];

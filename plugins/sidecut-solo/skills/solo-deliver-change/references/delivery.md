@@ -50,7 +50,7 @@ Reuse permission throughout the task. Ask only when a prepared result still lack
 
 Record the exact head, reviewer kind, blocking finding count and review notes.
 
-Save it with solo review --reviewed-head SHA --reviewer SAME_AGENT|INDEPENDENT|USER --review-notes TEXT --blocking-findings NUMBER. solo merge then reads it for the head, and the merge guard accepts gh pr merge --match-head-commit SHA only for a head with a clean saved review.
+Save it with solo review --reviewed-head SHA --reviewer SAME_AGENT|INDEPENDENT|USER --level LIGHT|STANDARD|DEEP --review-notes TEXT --blocking-findings NUMBER, adding --scope fix-diff for a review of only the fix. solo merge and solo automerge then read it for the head.
 
 The same four flags can also go on solo merge, or --reviewed-head SHA alone to use the review saved for that commit.
 
@@ -76,15 +76,11 @@ Merge method follows --method, then merge_method, then squash.
 
 After a timeout or failure, inspect the provider and reconcile before retrying.
 
-When provider protection enforces the required checks, gh pr merge --match-head-commit REVIEWED_SHA can provide the same head guard.
+The merge guard refuses any gh merge in the shell, the admin override included. A merge label or GitHub auto-merge that a repository uses goes through solo automerge PR (--label NAME for a label workflow): it refuses until the head has a clean saved review and permission holds, makes the handoff, records it and waits for the merge. It cannot replace the provider-enforced required checks.
 
-Use --auto only under those provider-enforced checks. Never merge with an admin override or omit the matching head.
+Run it straight after solo checks --reviewed-head. It returns when the PR merges, closes or fails a required check, or at its timeout; then run solo wait-merge PR to keep waiting. Where the host wakes the session when a background command exits, run it in the background with a long --timeout and carry on with independent work. A CI watcher such as Auto-fix speaks up only on failures, so it never stands in for the wait.
 
-A repository-required label, merge queue or workflow can replace the helper merge, but cannot replace its permission, review or check gates.
-
-Run checks --reviewed-head immediately before triggering it.
-
-Then run solo wait-merge PR. It returns when the PR merges, closes or fails a required check, or at its timeout; run it again after a timeout. Where the host wakes the session when a background command exits, run it in the background and carry on with independent work. A CI watcher such as Auto-fix speaks up only on failures, so it never stands in for the wait.
+A label or auto-merge set any other way is caught at the end of the turn from GitHub's view of the branch's PR, and sent back to solo automerge.
 
 Recheck the reviewed head after confirmation. Any new push needs fresh review and checks, and may require removing the trigger.
 

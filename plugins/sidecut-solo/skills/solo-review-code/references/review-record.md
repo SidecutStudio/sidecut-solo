@@ -2,7 +2,7 @@
 
 Read this when a review will feed the merge gate.
 
-Provide the full current head SHA, reviewer kind, blocking finding count and concise notes describing scope and results.
+Provide the full current head SHA, reviewer kind, level, scope, blocking finding count and concise notes describing scope and results.
 
 Reviewer kind is same-agent, independent or user. Name only independent workers that actually ran against that head.
 
@@ -12,7 +12,7 @@ Count unresolved blocker and major findings, Critical design findings and any mi
 
 Include whether design was reviewed and the reason when it was unavailable.
 
-Save it with `solo review`, which solo-deliver-change's merge reads. Inline arguments or a JSON file outside the repository worktree also work.
+Save it with `solo review --level light|standard|deep`, adding `--scope fix-diff` when it covered only the fix diff. solo-deliver-change's merge reads it. Inline arguments or a JSON file outside the repository worktree also work.
 
 JSON fields are head, reviewer, blocking_findings and notes.
 

@@ -37,4 +37,4 @@ Follow [re-review.md](re-review.md) to decide whether a scoped review covers the
 - **After a deep review with blocker or major findings:** review the full change again at deep.
 - **After a deep review with only minor findings:** review the fix diff alone, at the level `solo user-facing --base <reviewed-head> --head <new-head>` suggests. That is still deep when the fix diff touches a deep area.
 - **After a scoped review with blocker or major findings:** review the full change again at its own level.
-- **Cap:** a full deep round is a deep review of the whole change; scoped reviews don't count. If the third still finds blocker or major findings, report them and ask the user before a fourth. Minors left after the cap go in the report as known gaps or follow-ups.
+- **Cap:** a full deep round is a deep review of the whole change; fix-diff reviews don't count. `solo review` counts them and refuses one past `deep_review_rounds` (3 unless the repo sets it). Then stop and give the owner two choices: rethink the design, or accept the remaining minor findings. Minors they accept go in the report as known gaps or follow-ups.

@@ -12,7 +12,7 @@ export const MERGE_METHODS = ['squash', 'merge', 'rebase'] as const;
 const WORKTREE_POLICIES = ['always', 'when-overlapping', 'never'] as const;
 const REVIEW_EFFORTS = ['low', 'medium', 'high'] as const;
 
-type Kind = 'string' | 'table' | 'list';
+type Kind = 'string' | 'table' | 'list' | 'number';
 const KEYS: Record<string, Kind> = {
   base_branch: 'string',
   checks: 'table',
@@ -25,6 +25,7 @@ const KEYS: Record<string, Kind> = {
   review_model: 'string',
   codex_review_model: 'string',
   review_effort: 'string',
+  deep_review_rounds: 'number',
 };
 // What the skills do for a key nobody set. base_branch has no default: read it from the repo.
 // review_model is the Claude Code model; codex_review_model has none, so Codex keeps the parent's.
@@ -35,6 +36,7 @@ export const DEFAULTS = {
   review: 'auto',
   review_model: 'sonnet',
   review_effort: 'medium',
+  deep_review_rounds: 3,
 };
 const CHOICES: Record<string, readonly string[]> = {
   merge: MERGE_POLICIES,
@@ -56,10 +58,12 @@ type Settings = {
   review_model?: string;
   codex_review_model?: string;
   review_effort?: string;
+  deep_review_rounds?: number;
 };
 
 function kindOf(value: unknown): Kind | 'other' {
   if (typeof value === 'string') return 'string';
+  if (typeof value === 'number') return 'number';
   if (Array.isArray(value)) return 'list';
   if (
     value &&
@@ -85,6 +89,8 @@ function problems(data: Record<string, unknown>, name: string): [string, string]
       !Object.values(value as object).every((v) => typeof v === 'string')
     ) {
       found.push([key, `${name}: every [checks] entry must be a command string`]);
+    } else if (kind === 'number' && !(Number.isInteger(value) && (value as number) >= 1)) {
+      found.push([key, `${name}: '${key}' must be a whole number of at least 1`]);
     } else if (kind === 'list' && !(value as unknown[]).every((v) => typeof v === 'string')) {
       found.push([key, `${name}: '${key}' must list strings`]);
     }

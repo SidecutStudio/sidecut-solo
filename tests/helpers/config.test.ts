@@ -22,6 +22,7 @@ describe('settings', () => {
       review: 'auto',
       review_model: 'sonnet',
       review_effort: 'medium',
+      deep_review_rounds: 3,
     });
     expect(result.hint).toContain('Setup');
   });
@@ -37,6 +38,7 @@ describe('settings', () => {
       review: 'auto',
       review_model: 'sonnet',
       review_effort: 'medium',
+      deep_review_rounds: 3,
     });
     expect(result.hint).toBeUndefined();
   });

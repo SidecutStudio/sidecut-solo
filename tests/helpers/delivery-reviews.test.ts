@@ -11,7 +11,8 @@ describe('saved reviews and stacked PRs', () => {
   const review = (repo: string, head: string, count = '0') =>
     cli([
       ...['--repo', repo, 'review', '--reviewed-head', head, '--reviewer', 'independent'],
-      ...['--review-notes', 'Read the diff and tests', '--blocking-findings', count],
+      ...['--level', 'standard', '--review-notes', 'Read the diff and tests'],
+      ...['--blocking-findings', count],
     ]);
 
   test('merge uses the review saved for HEAD, and a merge leaves one behind', () => {
@@ -61,7 +62,7 @@ describe('saved reviews and stacked PRs', () => {
     expect(
       cli([
         ...['--repo', repo, 'review', '--reviewed-head', head, '--reviewer', 'independent'],
-        ...['--review-notes', '', '--blocking-findings', '0'],
+        ...['--level', 'deep', '--review-notes', '', '--blocking-findings', '0'],
       ]).stderr,
     ).toContain('needs notes');
   });
@@ -171,5 +172,78 @@ describe('saved reviews and stacked PRs', () => {
     expect(out.stdout).toContain('solo review --reviewed-head');
     expect(out.stdout).toContain('follow-ups');
     expect(out.stdout).toContain('--no-verify');
+    expect(out.stdout).toContain('solo automerge <pr>');
+    expect(out.stdout).toContain('After 3 deep rounds');
   });
+});
+
+describe('deep review rounds', () => {
+  const save = (repo: string, level: string, count: string, scope?: string) =>
+    cli([
+      ...['--repo', repo, 'review', '--reviewed-head', inventory(repo).head],
+      ...['--reviewer', 'independent', '--level', level, '--review-notes', 'Read the change'],
+      ...['--blocking-findings', count, ...(scope ? ['--scope', scope] : [])],
+    ]);
+  let n = 0;
+  const fix = (repo: string) => commit(repo, `fix${++n}.ts`, `${n}\n`, `fix ${n}`);
+
+  test('a fourth deep round on the same change is refused with the two choices', () => {
+    const { repo } = makeRepo();
+    git(repo, ['checkout', '-q', '-b', 'feature']);
+    for (const round of [1, 2, 3]) {
+      fix(repo);
+      const saved = save(repo, 'deep', round < 3 ? '1' : '0');
+      expect(saved.code).toBe(0);
+      expect(JSON.parse(saved.stdout).deep_rounds).toEqual({ used: round, cap: 3 });
+    }
+    fix(repo);
+    const fourth = save(repo, 'deep', '0');
+    expect(fourth.code).toBe(2);
+    expect(fourth.stderr).toContain('3 deep review rounds');
+    expect(fourth.stderr).toContain('rethink the design or accept the remaining minor findings');
+    // Re-saving the third round's own head is the same round, and lighter reviews still record.
+    expect(save(repo, 'standard', '0').code).toBe(0);
+    // After a round with no blocker or major findings, the fix diff alone is reviewed.
+    expect(save(repo, 'deep', '0', 'fix-diff').code).toBe(0);
+  }, 30_000);
+
+  test('the cap comes from deep_review_rounds, and a bad value is refused', () => {
+    const { repo } = makeRepo();
+    git(repo, ['checkout', '-q', '-b', 'feature']);
+    writeFileSync(join(repo, 'solo-workflow.local.toml'), 'deep_review_rounds = 1\n');
+    fix(repo);
+    expect(save(repo, 'deep', '0').code).toBe(0);
+    fix(repo);
+    expect(save(repo, 'deep', '0').stderr).toContain('the most deep_review_rounds allows (1)');
+    writeFileSync(join(repo, 'solo-workflow.local.toml'), 'deep_review_rounds = 0\n');
+    expect(save(repo, 'deep', '0').stderr).toContain('whole number of at least 1');
+  }, 30_000);
+
+  test('rounds count only on this change: reviews already on the base branch belong to earlier PRs', () => {
+    const { repo } = makeRepo();
+    for (let i = 0; i < 3; i++) {
+      fix(repo);
+      expect(save(repo, 'deep', '0').code).toBe(0);
+    }
+    git(repo, ['checkout', '-q', '-b', 'feature']);
+    fix(repo);
+    writeFileSync(join(repo, 'solo-workflow.local.toml'), 'base_branch = "main"\n');
+    expect(JSON.parse(save(repo, 'deep', '0').stdout).deep_rounds.used).toBe(1);
+  }, 30_000);
+
+  test('a fix-diff review needs an earlier review that left no blocker or major findings', () => {
+    const { repo } = makeRepo();
+    git(repo, ['checkout', '-q', '-b', 'feature']);
+    fix(repo);
+    expect(save(repo, 'deep', '0', 'fix-diff').stderr).toContain('no earlier review');
+    expect(save(repo, 'deep', '2').code).toBe(0);
+    fix(repo);
+    expect(save(repo, 'deep', '0', 'fix-diff').stderr).toContain('left 2 blocker or major');
+    expect(
+      cli([
+        ...['--repo', repo, 'review', '--reviewed-head', inventory(repo).head],
+        ...['--reviewer', 'user', '--review-notes', 'x', '--blocking-findings', '0'],
+      ]).stderr,
+    ).toContain('--level is required');
+  }, 30_000);
 });
