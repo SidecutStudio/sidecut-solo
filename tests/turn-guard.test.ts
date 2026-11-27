@@ -339,6 +339,14 @@ describe('solo automerge and wait-merge', () => {
     expect(clean.code).toBe(2);
     expect(clean.stderr).toContain('GitHub would merge this PR at once');
     expect(calls().some((call) => call[0] === 'pr' && call[1] === 'merge')).toBe(false);
+    // Until GitHub has worked mergeability out, gh's own read could still find it clean.
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false, 'unknown') }] },
+      checks(null),
+      handOff,
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait').stderr).toContain('run solo automerge again in a moment');
     // A label workflow decides for itself.
     fakeGh([
       { args: ['api', PR], replies: [{ stdout: rest(head, false, 'clean') }] },
@@ -497,6 +505,25 @@ describe('solo automerge and wait-merge', () => {
     ]);
     expect(readdirSync(handoffs(repo))).toEqual([]);
     expect(hook(stop(repo), home)).toBeNull();
+  });
+
+  test('a push that merged before a poll saw it is reported as merged unreviewed', () => {
+    const repo = soloRepo();
+    recorded(repo, { head: 'reviewed' });
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest('pushed-later', true) }] },
+      checks('success'),
+      statuses,
+      labels('automerge'),
+    ]);
+    const done = cli([
+      ...['--repo', repo, 'wait-merge', '461', '--require-check', 'gate', '--interval', '0.05'],
+    ]);
+    expect(done.code).toBe(1);
+    const result = JSON.parse(done.stdout);
+    expect(result.status).toBe('merged-unreviewed');
+    expect(result.next).toContain('review reviewed..pushed-later');
+    expect(readdirSync(handoffs(repo))).toEqual([]);
   });
 
   test('a label taken off ends the wait and the hold', () => {

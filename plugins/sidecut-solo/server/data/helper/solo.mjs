@@ -4023,13 +4023,15 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
       }
       const view = seen.pr;
       const base = { pr: prNumber(pr), head: seen.head };
+      const handedHead = read(path).head;
       if (view.state === "MERGED") {
         done();
+        const moved = typeof handedHead === "string" && handedHead !== seen.head;
         result = {
           ...base,
-          status: "merged",
+          status: moved ? "merged-unreviewed" : "merged",
           ...view.mergeCommit?.oid ? { merge_commit: view.mergeCommit.oid } : {},
-          next: "Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup."
+          next: moved ? `It merged at ${seen.head.slice(0, 12)}, not the reviewed ${handedHead.slice(0, 12)}: review ${handedHead.slice(0, 12)}..${seen.head.slice(0, 12)} now and tell the user what merged unreviewed and what you found, before the steps after the merge.` : "Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup."
         };
       } else if (view.state === "CLOSED") {
         done();
@@ -4038,7 +4040,7 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
           status: "closed",
           next: "The PR was closed without merging. Find out why before doing anything else with it."
         };
-      } else if (typeof read(path).head === "string" && read(path).head !== seen.head) {
+      } else if (typeof handedHead === "string" && handedHead !== seen.head) {
         const handed = read(path);
         const off = String(handed.via ?? "").startsWith("label ") ? takeLabelOff(repo, pr, String(handed.via).slice(6)) : spawn(["gh", "pr", "merge", pr, "--disable-auto"], repo);
         done();
@@ -4106,6 +4108,10 @@ async function automerge(repo, pr, options) {
   if (!options.label && ["CLEAN", "UNSTABLE", "HAS_HOOKS"].includes(state))
     reasons.push(
       `GitHub would merge this PR at once (${state.toLowerCase()}), since nothing makes it wait for the required checks: merge it with solo merge once they pass`
+    );
+  else if (!options.label && !["BLOCKED", "BEHIND"].includes(state))
+    reasons.push(
+      `GitHub reports this PR as ${state.toLowerCase() || "unknown"}, not blocked on its checks: if it is still working that out (unknown), run solo automerge again in a moment; otherwise fix what it reports first`
     );
   const prBase = seen.pr.baseRefName;
   if (options.base && prBase && prBase !== options.base) {

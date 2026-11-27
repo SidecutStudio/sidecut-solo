@@ -78,7 +78,14 @@ function takeLabelOff(repo: string, pr: string, label: string) {
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 export type WaitResult = {
-  status: 'merged' | 'closed' | 'not-handed-off' | 'head-moved' | 'check-failed' | 'timeout';
+  status:
+    | 'merged'
+    | 'merged-unreviewed'
+    | 'closed'
+    | 'not-handed-off'
+    | 'head-moved'
+    | 'check-failed'
+    | 'timeout';
   pr: string;
   head?: string;
   merge_commit?: string;
@@ -124,13 +131,18 @@ export async function waitMerge(
       }
       const view = seen.pr as { state?: string; mergeCommit?: { oid?: string } };
       const base = { pr: prNumber(pr), head: seen.head };
+      const handedHead = read(path).head;
       if (view.state === 'MERGED') {
         done();
+        // A push after the handoff that merged before a poll saw it went in unreviewed.
+        const moved = typeof handedHead === 'string' && handedHead !== seen.head;
         result = {
           ...base,
-          status: 'merged',
+          status: moved ? 'merged-unreviewed' : 'merged',
           ...(view.mergeCommit?.oid ? { merge_commit: view.mergeCommit.oid } : {}),
-          next: 'Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup.',
+          next: moved
+            ? `It merged at ${seen.head.slice(0, 12)}, not the reviewed ${handedHead.slice(0, 12)}: review ${handedHead.slice(0, 12)}..${seen.head.slice(0, 12)} now and tell the user what merged unreviewed and what you found, before the steps after the merge.`
+            : 'Carry on with the steps after the merge: confirm the merged head, then every requested release, deployment and cleanup.',
         };
       } else if (view.state === 'CLOSED') {
         done();
@@ -139,7 +151,7 @@ export async function waitMerge(
           status: 'closed',
           next: 'The PR was closed without merging. Find out why before doing anything else with it.',
         };
-      } else if (typeof read(path).head === 'string' && read(path).head !== seen.head) {
+      } else if (typeof handedHead === 'string' && handedHead !== seen.head) {
         // `solo automerge` handed off a reviewed head; a later push must not merge unreviewed.
         const handed = read(path);
         const off = String(handed.via ?? '').startsWith('label ')
@@ -241,6 +253,11 @@ export async function automerge(repo: string, pr: string, options: AutomergeOpti
   if (!options.label && ['CLEAN', 'UNSTABLE', 'HAS_HOOKS'].includes(state))
     reasons.push(
       `GitHub would merge this PR at once (${state.toLowerCase()}), since nothing makes it wait for the required checks: merge it with solo merge once they pass`,
+    );
+  // GitHub works mergeability out in the background; until it has, gh's own read may say clean.
+  else if (!options.label && !['BLOCKED', 'BEHIND'].includes(state))
+    reasons.push(
+      `GitHub reports this PR as ${state.toLowerCase() || 'unknown'}, not blocked on its checks: if it is still working that out (unknown), run solo automerge again in a moment; otherwise fix what it reports first`,
     );
   // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
   const prBase = (seen.pr as { baseRefName?: string }).baseRefName;
