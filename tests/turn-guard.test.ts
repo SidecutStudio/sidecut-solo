@@ -77,14 +77,13 @@ async function watcher(script: string, cwd: string, argv = ['sh', '-c', `sleep 3
   }
   throw new Error('the watcher never started');
 }
-// The Solo helper's own process, as the waiter PID names it: node running solo.mjs wait-merge.
+// The Solo helper's own process, as the waiter PID names it: node running solo.mjs ARGS.
 const helper = (args: string, cwd: string) =>
   watcher('', cwd, [
     'node',
     '-e',
     'setTimeout(() => {}, 30000)',
     '/p/solo.mjs',
-    'wait-merge',
     ...args.split(' '),
   ]);
 const claim = (repo: string, pid: number, name = 'pr-461.json') =>
@@ -137,7 +136,7 @@ describe('automerge handoff', () => {
     const home = scratch();
     hook(bash(repo, 'gh pr merge 461 --auto --squash'), home);
     // A wait-merge that ps can't place in this repo, so only its waiter PID speaks for it.
-    claim(repo, await helper('461 --repo /nowhere', scratch()));
+    claim(repo, await helper('wait-merge 461 --repo /nowhere', scratch()));
     expect(hook(stop(repo), home)).toBeNull();
   });
 
@@ -199,6 +198,28 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
   });
 
+  test('solo options before the subcommand, and a quoted launcher path, are read', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    hook(bash(repo, 'gh pr merge 462 --auto'), home);
+    // The helper itself, started with a task id, as its waiter PID names it.
+    claim(repo, await helper('--task t1 wait-merge 461', scratch()));
+    // A loop around a quoted path, in the form Claude Code's quoting leaves it.
+    await watcher(`eval 'sleep 9; sh '"'"'/a b/helper/solo'"'"' --task t1 wait-merge 462'`, repo);
+    expect(hook(stop(repo), home)).toBeNull();
+  });
+
+  test('a shell that only mentions wait-merge in an argument is no watcher', async () => {
+    const repo = soloRepo();
+    const home = scratch();
+    hook(bash(repo, 'gh pr merge 461 --auto'), home);
+    await watcher(`echo 'Do not run solo wait-merge 461 yet'`, repo);
+    await watcher(`node -e 1 -- 'PR 461 is on automerge. Run solo wait-merge 461 then tag.'`, repo);
+    await watcher(`grep 'solo wait-merge 461' notes.txt`, repo);
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
   test('a session that never started a watcher is held', async () => {
     const repo = soloRepo();
     const home = scratch();
@@ -254,7 +275,7 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)).toBeNull();
     hook(bash(repo, 'gh pr edit 461 --add-label automerge'), home);
     hook(bash(repo, 'gh pr edit 462 --add-label automerge'), home);
-    claim(repo, await helper('461 --repo /nowhere', scratch()));
+    claim(repo, await helper('wait-merge 461 --repo /nowhere', scratch()));
     const refused = hook(stop(repo), home);
     expect(refused?.reason).toContain('PR #462');
     expect(refused?.reason).not.toContain('PR #461');

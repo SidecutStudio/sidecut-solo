@@ -238,13 +238,24 @@ function canWatch(command) {
   if (SHELLS.has(name)) return true;
   return (
     /^node(?:\d[\w.]*)?$/.test(name) &&
-    /solo\.mjs\s+(?:--repo[= ]\S+\s+)?wait-merge\b/.test(command)
+    new RegExp(String.raw`solo\.mjs${GLOBALS}\s+wait-merge\b`).test(command)
   );
 }
 
-/** A Solo launcher word just before `wait-merge`: `solo`, a path to it, or a variable holding one. */
-const LAUNCH =
-  /(?:(?:^|[\s'"(])(?:\S*\/)?solo(?:\.mjs)?|(?:^|\s)"?\$\{?\w+\}?"?)['"]?((?:\s+--repo(?:=|\s+)\S+)?)\s+wait-merge(?=\s|$)/g;
+/** Solo's options that come before the subcommand, such as `solo --repo R --task T wait-merge`. */
+const GLOBALS = String.raw`((?:\s+--(?:repo|task)(?:=|\s+)\S+)*)`;
+/**
+ * `solo wait-merge` as a command, not text inside an argument: at the start of a simple command,
+ * after words that run what follows (`do`, `eval '`, `nohup`, an assignment, `sh`, `node`...),
+ * the launcher is `solo`, a path to it (quoted, even with Claude Code's `'"'"'` escaping), or a
+ * variable holding one.
+ */
+const LAUNCH = new RegExp(
+  String.raw`^\s*(?:(?:[({!]|do|then|else|eval|nohup|time|exec|command|env|sudo|timeout\s+\S+|[A-Za-z_]\w*=\S*|(?:\S*\/)?(?:sh|bash|zsh|dash|ksh)(?:\s+-\w+)*)\s*['"]*\s*)*` +
+    String.raw`(?:(?:\S*\/)?node(?:\s+-\S+)*\s+.*?solo\.mjs|['"]+[^'"]*\/solo(?:\.mjs)?['"]+|['"]*(?:[^\s'"]*\/)?solo(?:\.mjs)?['"]*|['"]*\$\{?\w+\}?['"]*)` +
+    GLOBALS +
+    String.raw`\s+wait-merge(?=[\s'")]|$)`,
+);
 
 /**
  * Each `solo wait-merge` a command line runs, as { pr, repo }: the one PR it waits on and its
@@ -254,7 +265,7 @@ const LAUNCH =
 export function waitsIn(command) {
   const found = [];
   for (const part of String(command).split(/\\012|[;&|\n]+|\$\(|`/)) {
-    for (const at of part.matchAll(LAUNCH)) {
+    for (const at of [LAUNCH.exec(part)].filter(Boolean)) {
       let repo = /--repo(?:=|\s+)(\S+)/.exec(at[1] ?? '')?.[1];
       const words = part
         .slice((at.index ?? 0) + at[0].length)
