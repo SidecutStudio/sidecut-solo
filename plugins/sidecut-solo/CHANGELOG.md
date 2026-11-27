@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.42.3] - 2026-11-27
+
+### Changed
+
+- `solo-test-behavior` now says to test a web app on loopback with disposable data and sample responses at paid or external boundaries, and to keep provider and hosting checks apart from that offline suite. This was Sidecut Cookbook's app-testing recipe, which moved here when Cookbook joined Sidecut Home.
+
 ## [0.42.2] - 2026-11-27
 
 ### Fixed
