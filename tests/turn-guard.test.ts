@@ -667,6 +667,35 @@ describe('named skills', () => {
     );
   });
 
+  test('a deferral leading a clause or a list covers what follows it', () => {
+    const home = scratch();
+    const repo = scratch();
+    const brief = [
+      'Later, run solo-deliver-change.',
+      'Next step: solo-test-behavior',
+      'Use solo-build-change (later: solo-compare-plugin)',
+      'Plan with solo-plan-change — another session runs solo-write-copy.',
+      'After that:',
+      '- solo-diagnose-problem',
+      '- solo-research-topic',
+      'Now check it with solo-review-code.',
+    ].join('\n');
+    hook(prompt(repo, brief, 'l1'), home, 'UserPromptSubmit');
+    const reason = hook(stop(repo, 'l1'), home)?.reason ?? '';
+    expect(reason).toContain(
+      'sidecut-solo:solo-build-change, sidecut-solo:solo-plan-change, sidecut-solo:solo-review-code,',
+    );
+    for (const later of [
+      'deliver-change',
+      'test-behavior',
+      'compare-plugin',
+      'write-copy',
+      'diagnose-problem',
+      'research-topic',
+    ])
+      expect(reason).not.toContain(`solo-${later}`);
+  });
+
   test('a huge run of one character is read quickly', () => {
     const home = scratch();
     const repo = scratch();

@@ -10,8 +10,8 @@
 //   it skipped. A record is watched while the wait-merge that claimed it is alive and inside the
 //   wait it announced. Nothing here reads shell commands.
 // - UserPromptSubmit: the Solo skills the user's own words ask this session to run are noted. Relayed
-//   blocks (another session's message, a task notification, pasted text), quotes, code and clauses
-//   about a later step or another session don't count.
+//   blocks (another session's message, a task notification, pasted text), quotes, code and anything a
+//   sentence leaves to a later step or another session don't count.
 // - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
 //   loaded is raised once.
 //
@@ -255,12 +255,16 @@ const RELAYED = [
   'ci-monitor-event',
 ];
 const SKILL_NAME = /(?<![\w/-])(\/)?(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w/-])/g;
-// A clause that puts a skill on a later step or on another session doesn't ask for it now.
+// Words that leave a skill to a later step or to another session.
 const DEFERRED =
   /\b(?:later|afterwards|after that|follow-?up|next step|(?:another|other|separate|side|new|next|parent) session|the session that started you)\b/i;
-// Clauses end at sentence ends, line breaks, commas and joining words, so one deferred clause
-// doesn't drop the skills the rest of the sentence asks for.
-const CLAUSE = /(?<=[.!?;:,])\s+|\n+|(?<=\s)(?:and|then|but|while|which|before)(?=\s)/i;
+// A deferral covers its own clause and the rest of its sentence, so "Later, run X" and "Use X
+// (later: Y)" both read right, and a skill asked for before it still counts. A line ending in a
+// colon carries its deferral to the list items under it.
+const SENTENCE = /(?<=[.!?])\s+|(?<=[.!?])(?=[A-Z])/;
+const CLAUSE =
+  /[,;()]|:(?=\s|$)|\s[\u2014\u2013-]\s|(?<=[\s(])(?:and|then|but|while|which|before)(?=\s)/i;
+const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/;
 
 /** The prompt's own words: code, relayed blocks and quotes left out. */
 function ownWords(prompt) {
@@ -285,16 +289,25 @@ function ownWords(prompt) {
 
 /**
  * Solo skills the user's own message asks this session to run, such as `solo-build-change` or
- * `/sidecut-solo:solo-deliver-change`. A slash command always counts; a name in a clause about a
- * later step or another session doesn't.
+ * `/sidecut-solo:solo-deliver-change`. A slash command in the user's words always counts; a name
+ * after a word that leaves it to a later step or another session doesn't.
  */
 export function namedSkills(prompt) {
   const found = new Set();
-  for (const clause of ownWords(prompt).split(CLAUSE)) {
-    const deferred = DEFERRED.test(clause);
-    for (const [, slash, name] of clause.matchAll(SKILL_NAME)) {
-      if (deferred && !slash) continue;
-      if (existsSync(join(SKILLS, name, 'SKILL.md'))) found.add(name);
+  let carried = false;
+  for (const line of ownWords(prompt).split('\n')) {
+    if (!line.trim()) continue;
+    if (!LIST_ITEM.test(line)) carried = false;
+    for (const sentence of line.split(SENTENCE)) {
+      let deferred = carried;
+      for (const clause of sentence.split(CLAUSE)) {
+        if (DEFERRED.test(clause)) deferred = true;
+        for (const [, slash, name] of clause.matchAll(SKILL_NAME)) {
+          if (deferred && !slash) continue;
+          if (existsSync(join(SKILLS, name, 'SKILL.md'))) found.add(name);
+        }
+      }
+      if (deferred && /:\s*$/.test(sentence)) carried = true;
     }
   }
   return [...found];
