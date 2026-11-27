@@ -258,20 +258,40 @@ const RELAYED = [
 // An exact `/sidecut-solo:solo-x` slash command, the one form that asks for a skill by name.
 const SLASH = /(?<![\w/.:-])\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/g;
 
+/**
+ * Drops fenced code blocks. A fence with no closing line isn't stripped, so it can't swallow a
+ * relayed block's close; a marker already seen unclosed isn't searched for again, which keeps this
+ * linear.
+ */
+function stripFences(text) {
+  const lines = text.split('\n');
+  const kept = [];
+  const unclosed = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    // A backtick fence line holds no other backticks.
+    const marker = /^[ \t]*(`{3,}(?!`)(?=[^`]*$)|~{3,}(?!~))/.exec(lines[i])?.[1];
+    if (marker && !unclosed.has(marker)) {
+      let end = i + 1;
+      while (end < lines.length && lines[end].trim() !== marker) end++;
+      if (end < lines.length) {
+        i = end;
+        continue;
+      }
+      unclosed.add(marker);
+    }
+    kept.push(lines[i]);
+  }
+  return kept.join('\n');
+}
+
 /** The prompt's own words: code, relayed blocks and quoted lines left out. */
 function ownWords(prompt) {
-  // Fences first, then inline code, so a tag named inside code isn't read as a relayed block.
-  // A backtick fence line holds no other backticks; `(?!`)` keeps each line to one match attempt.
-  let text = String(prompt)
-    .replace(
-      /^[ \t]*(`{3,}(?!`)(?=[^`\n]*$)|~{3,}(?!~))[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm,
-      '\n',
-    )
-    .replace(/`[^`\n]*`/g, ' ');
+  // Code first, so a tag named inside code isn't read as a relayed block.
+  let text = stripFences(String(prompt)).replace(/`[^`\n]*`/g, ' ');
   for (const tag of RELAYED) {
     // A relayed block left open runs to the end of the prompt: what follows is still relayed.
     const open = `<\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
-    const close = `<\\/\\\\?~?${tag}\\s*>`;
+    const close = `<\\/\\\\?~?${tag}\\b[^>\\n]{0,400}>`;
     text = text.replace(new RegExp(`${open}[\\s\\S]*?(?:${close}|$)`, 'gi'), '\n');
   }
   return text.replace(/^[ \t]*>.*$/gm, '');
@@ -285,14 +305,15 @@ const isSkill = (name) => existsSync(join(SKILLS, name, 'SKILL.md'));
  * so those are loaded; any other `/sidecut-solo:solo-x` in the user's own words is still owed.
  * Prose names, code, quotes and relayed text never count.
  */
-export function namedSkills(prompt) {
+export function namedSkills(prompt, host) {
   const text = String(prompt ?? '');
   const loaded = new Set();
   const opener =
     /^\s*(?:<command-name>\s*)?\/sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)(?![\w/:-])/.exec(text)?.[1];
   if (opener && isSkill(opener)) loaded.add(opener);
-  for (const [, name] of text.matchAll(/(?<![\w$])\$sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)/g))
-    if (isSkill(name)) loaded.add(name);
+  if (host === 'codex')
+    for (const [, name] of text.matchAll(/(?<![\w$])\$sidecut-solo:(solo-[a-z]+(?:-[a-z]+)*)/g))
+      if (isSkill(name)) loaded.add(name);
   const named = new Set();
   for (const [, name] of ownWords(text).matchAll(SLASH))
     if (!loaded.has(name) && isSkill(name)) named.add(name);
@@ -331,7 +352,7 @@ export function notePrompt(raw) {
   const input = normal(raw);
   // Claude Code marks prompts it makes itself (a wake-up, a schedule); only the user's count.
   const own = !input.source || input.source === 'user';
-  const { named, loaded } = own ? namedSkills(input.prompt) : { named: [], loaded: [] };
+  const { named, loaded } = own ? namedSkills(input.prompt, input.host) : { named: [], loaded: [] };
   if (named.length || loaded.length)
     noteSession(input.session, (notes) => {
       notes.named = [...new Set([...(notes.named ?? []), ...named])];

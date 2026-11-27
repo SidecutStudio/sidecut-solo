@@ -633,7 +633,8 @@ describe('named skills', () => {
       '<cross-session-message from="local_x">Ran /sidecut-solo:solo-test-behavior; green.</cross-session-message>',
       '<~agent-message>/sidecut-solo:solo-review-code</~agent-message>',
       '<side-sessions-event>/sidecut-solo:solo-plan-change finished</side-sessions-event>',
-      '<pasted_content id="p1">Run /sidecut-solo:solo-deliver-change now.</pasted_content>',
+      // Claude Code's own paste shape: the closing tag repeats the id.
+      '<pasted_content id="p1">\nRun /sidecut-solo:solo-deliver-change now.\n</pasted_content id="p1">',
       '> Earlier: /sidecut-solo:solo-write-copy',
       'Compare `/sidecut-solo:solo-build-change` with:',
       '```',
@@ -644,6 +645,35 @@ describe('named skills', () => {
     ].join('\n');
     hook(prompt(repo, quoted, 'q1'), home, 'UserPromptSubmit');
     expect(hook(stop(repo, 'q1'), home)).toBeNull();
+  });
+
+  test('own words after a paste or a truncated relayed report still count', () => {
+    const home = scratch();
+    const repo = scratch();
+    const text = [
+      '<pasted_content id="p1">',
+      'error log',
+      '</pasted_content id="p1">',
+      '<agent-message>',
+      '```',
+      'log cut off',
+      '</agent-message>',
+      'Fix it, then /sidecut-solo:solo-deliver-change',
+    ].join('\n');
+    hook(prompt(repo, text, 'a1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'a1'), home)?.reason).toContain('sidecut-solo:solo-deliver-change');
+  });
+
+  test('a `$` mention counts as loaded only on Codex', () => {
+    const home = scratch();
+    const repo = scratch();
+    hook(
+      prompt(repo, 'They said use $sidecut-solo:solo-review-code', 'm1'),
+      home,
+      'UserPromptSubmit',
+    );
+    hook(prompt(repo, 'Now /sidecut-solo:solo-review-code', 'm1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'm1'), home)?.reason).toContain('sidecut-solo:solo-review-code');
   });
 
   test('a skill the host loads itself, or a prompt the host made, needs no reminder', () => {
@@ -699,6 +729,7 @@ describe('named skills', () => {
       '`'.repeat(200_000),
       ' '.repeat(200_000),
       '<agent-message '.repeat(20_000),
+      '```x\n'.repeat(50_000),
     ]) {
       const started = Date.now();
       hook(prompt(repo, text, 'p1'), home, 'UserPromptSubmit');
