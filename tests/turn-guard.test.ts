@@ -743,6 +743,8 @@ describe('named skills', () => {
       '`'.repeat(200_000),
       ' '.repeat(200_000),
       '<agent-message '.repeat(20_000),
+      // One line of backtick runs of 1,400 different lengths, about 1 MB.
+      Array.from({ length: 1400 }, (_, k) => `${'`'.repeat(k + 1)} a `).join(''),
       '```x\n'.repeat(50_000),
     ]) {
       const started = Date.now();

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.42.2] - 2026-11-27
+
+### Fixed
+
+- The turn guard reads inline code in one pass over a line's backtick runs. A pasted line of about a megabyte with many different run lengths took over three seconds against the prompt hook's five-second limit; it now takes a few milliseconds, and what counts as code is unchanged.
+
 ## [0.42.1] - 2026-11-27
 
 ### Fixed
