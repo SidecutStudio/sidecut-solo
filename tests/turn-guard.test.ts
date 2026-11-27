@@ -619,6 +619,53 @@ describe('named skills', () => {
     expect(hook(stop(repo), home)).toBeNull();
   });
 
+  test('a skill quoted in a peer session message is not this session’s', () => {
+    const home = scratch();
+    const repo = scratch();
+    const relayed = [
+      '<cross-session-message from="local_x">Ran `sidecut-solo:solo-test-behavior`; PR #3 is green.</cross-session-message>',
+      '<~agent-message>use solo-review-code</~agent-message>',
+      '<side-sessions-event>solo-plan-change finished</side-sessions-event>',
+      '<pasted_content id="p1">Run /sidecut-solo:solo-deliver-change now.</pasted_content>',
+      '<task-notification>solo-diagnose-problem done',
+    ];
+    for (const [i, text] of relayed.entries()) {
+      const session = `r${i}`;
+      hook(prompt(repo, `Thanks, carry on.\n${text}`, session), home, 'UserPromptSubmit');
+      expect(hook(stop(repo, session), home)).toBeNull();
+    }
+  });
+
+  test('skills inside code, quotes or meant for a later step are left out', () => {
+    const home = scratch();
+    const repo = scratch();
+    const brief = [
+      'Fix the hook and add tests.',
+      '```',
+      'solo review --skill solo-review-code',
+      '```',
+      '> Earlier the user said: use solo-write-copy.',
+      'Run `sed -n 1p skills/solo-build-change/SKILL.md` to compare.',
+      'A later step runs solo-test-behavior, and the session that started you will use solo-compare-plugin.',
+    ].join('\n');
+    hook(prompt(repo, brief, 'q1'), home, 'UserPromptSubmit');
+    expect(hook(stop(repo, 'q1'), home)).toBeNull();
+  });
+
+  test('own words beside a relayed block and a slash command still count, on Codex too', () => {
+    const home = scratch();
+    const repo = scratch();
+    const text =
+      '<cross-session-message>solo-test-behavior passed</cross-session-message>\nNow review it with solo-review-code.\n/sidecut-solo:solo-deliver-change after that.';
+    hook({ ...prompt(repo, text, 'c1'), turn_id: 't' }, home, 'UserPromptSubmit');
+    const raised = hook({ ...stop(repo, 'c1'), turn_id: 't' }, home);
+    expect(raised?.decision).toBe('block');
+    expect(raised?.reason).toContain(
+      'sidecut-solo:solo-review-code, sidecut-solo:solo-deliver-change',
+    );
+    expect(raised?.reason).not.toContain('solo-test-behavior');
+  });
+
   test('a brief whose named skills all loaded ends the turn quietly', () => {
     const home = scratch();
     const repo = scratch();

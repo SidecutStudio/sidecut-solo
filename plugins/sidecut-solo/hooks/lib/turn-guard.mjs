@@ -9,7 +9,9 @@
 //   outside Solo, so it gets a record here and the session is sent to `solo automerge`, whose gates
 //   it skipped. A record is watched while the wait-merge that claimed it is alive and inside the
 //   wait it announced. Nothing here reads shell commands.
-// - UserPromptSubmit: the Solo skills a prompt names are noted for the session.
+// - UserPromptSubmit: the Solo skills the user's own words ask this session to run are noted. Relayed
+//   blocks (another session's message, a task notification, pasted text), quotes, code and sentences
+//   about a later step or another session don't count.
 // - PostToolUse: the Solo skills the session loads are noted, and at Stop each named skill that never
 //   loaded is raised once.
 //
@@ -243,12 +245,49 @@ function handoffReason(input) {
 
 // ---- Named skills -------------------------------------------------------------------------------
 
-/** Solo skills a prompt names, such as `solo-build-change` or `/sidecut-solo:solo-deliver-change`. */
+// Text the host or another session relays into a prompt. Skills named there are someone else's.
+const RELAYED = [
+  'cross-session-message',
+  'agent-message',
+  'side-sessions-event',
+  'pasted_content',
+  'task-notification',
+  'ci-monitor-event',
+];
+const SKILL_NAME = /(?<![\w/-])(\/)?(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w/-])/g;
+// A sentence that puts a skill on a later step or on another session doesn't ask for it now.
+const DEFERRED =
+  /\b(?:later|afterwards|after that|follow-?up|next step|(?:another|other|separate|side|new|next|parent) session|the session that started you)\b/i;
+
+/** The prompt's own words: relayed blocks, quotes and code left out. */
+function ownWords(prompt) {
+  let text = String(prompt);
+  for (const tag of RELAYED) {
+    const open = `<\\\\?~?${tag}\\b[^>]*>`;
+    const close = `<\\/\\\\?~?${tag}\\s*>`;
+    text = text.replace(new RegExp(`${open}[\\s\\S]*?(?:${close}|$)`, 'gi'), '\n');
+  }
+  return text
+    .replace(/^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\1[ \t]*$|(?![\s\S]))/gm, '\n')
+    .replace(/^[ \t]*>.*$/gm, '')
+    .replace(/`([^`\n]*)`/g, (span, inner) =>
+      /^\/?(?:sidecut-solo:)?solo-[a-z-]+$/.test(inner.trim()) ? inner : ' ',
+    );
+}
+
+/**
+ * Solo skills the user's own message asks this session to run, such as `solo-build-change` or
+ * `/sidecut-solo:solo-deliver-change`. A slash command always counts; a name in a sentence about a
+ * later step or another session doesn't.
+ */
 export function namedSkills(prompt) {
   const found = new Set();
-  const pattern = /(?<![\w-])(?:sidecut-solo:)?(solo-[a-z]+(?:-[a-z]+)*)(?![\w-])/g;
-  for (const match of String(prompt).matchAll(pattern)) {
-    if (existsSync(join(SKILLS, match[1], 'SKILL.md'))) found.add(match[1]);
+  for (const sentence of ownWords(prompt).split(/(?<=[.!?;])\s+|\n+/)) {
+    const deferred = DEFERRED.test(sentence);
+    for (const [, slash, name] of sentence.matchAll(SKILL_NAME)) {
+      if (deferred && !slash) continue;
+      if (existsSync(join(SKILLS, name, 'SKILL.md'))) found.add(name);
+    }
   }
   return [...found];
 }
