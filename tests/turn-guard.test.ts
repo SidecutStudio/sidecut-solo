@@ -190,28 +190,35 @@ describe('automerge handoff', () => {
     expect(hook(stop(repo), home)).toBeNull();
   });
 
-  test('Antigravity gets the same hold in its own shape', () => {
+  test('Antigravity gets the same hold in its own shape, fresh for each user message', () => {
     const repo = soloRepo();
     const home = scratch();
     recorded(repo);
-    const held = hook({ conversationId: 'c1', workspacePaths: [repo], fullyIdle: true }, home);
+    const stopIn = (said: string) =>
+      hook({ conversationId: 'c1', workspacePaths: [repo], lastUserInput: said }, home);
+    const held = stopIn('ship it');
     expect(held?.decision).toBe('continue');
     expect(held?.reason).toContain('solo wait-merge 461');
+    expect(stopIn('ship it')?.decision).toBe('continue');
+    expect(stopIn('ship it')).toBeNull();
+    // No prompt hook there: a new user message is what gives the hold back.
+    expect(stopIn('and the release?')?.decision).toBe('continue');
   });
 });
 
 describe('solo automerge and wait-merge', () => {
   const PR = 'repos/{owner}/{repo}/pulls/461';
-  const rest = (head: string, merged: boolean) => ({
+  // Branch protection holds an open PR back while its required checks run.
+  const rest = (head: string, merged: boolean, state = 'blocked', base = 'main') => ({
     number: 461,
     html_url: 'https://github.com/o/r/pull/461',
     head: { sha: head, ref: 'feature' },
-    base: { ref: 'main' },
+    base: { ref: base },
     state: merged ? 'closed' : 'open',
     merged_at: merged ? '2026-11-26T19:34:50Z' : null,
     merge_commit_sha: merged ? '7f4d285' : null,
     mergeable: true,
-    mergeable_state: 'clean',
+    mergeable_state: state,
   });
   const checks = (conclusion: string | null): Rule => ({
     args: ['api', '--paginate', '--slurp'],
@@ -317,6 +324,82 @@ describe('solo automerge and wait-merge', () => {
     );
   });
 
+  test('refuses what auto-merge would merge at once, a missing check and a stacked PR', () => {
+    const repo = soloRepo();
+    const head = git(repo, ['rev-parse', 'HEAD']);
+    reviewed(repo, head);
+    // Nothing holds a clean PR back, so gh would merge it now instead of turning auto-merge on.
+    let calls = fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false, 'clean') }] },
+      checks(null),
+      handOff,
+      statuses,
+    ]);
+    const clean = automerge(repo, '--no-wait');
+    expect(clean.code).toBe(2);
+    expect(clean.stderr).toContain('GitHub would merge this PR at once');
+    expect(calls().some((call) => call[0] === 'pr' && call[1] === 'merge')).toBe(false);
+    // A label workflow decides for itself.
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false, 'clean') }] },
+      checks(null),
+      { args: ['api', '--method', 'POST'], replies: [{ stdout: [] }] },
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait', '--label', 'automerge').code).toBe(0);
+    // A required check that never reported can't be waited on.
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
+      { args: ['api', '--paginate', '--slurp'], replies: [{ stdout: [{ check_runs: [] }] }] },
+      handOff,
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait').stderr).toContain('gate (missing)');
+    // A PR stacked on another open PR's branch waits for the one below.
+    writeFileSync(join(repo, 'solo-workflow.local.toml'), 'base_branch = "main"\n');
+    calls = fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false, 'blocked', 'lower') }] },
+      checks(null),
+      {
+        args: ['api', 'repos/{owner}/{repo}/pulls?state=open&per_page=100'],
+        replies: [
+          {
+            stdout: [
+              [
+                {
+                  number: 460,
+                  head: { ref: 'lower', repo: { full_name: 'o/r' } },
+                  base: { ref: 'main', repo: { full_name: 'o/r' } },
+                },
+              ],
+            ],
+          },
+        ],
+      },
+      handOff,
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait').stderr).toContain('stacked on PR 460');
+    expect(calls().some((call) => call[0] === 'pr' && call[1] === 'merge')).toBe(false);
+  });
+
+  test("a handoff the turn guard caught outside Solo is Solo's once solo automerge runs", () => {
+    const repo = soloRepo();
+    const home = scratch();
+    const head = git(repo, ['rev-parse', 'HEAD']);
+    reviewed(repo, head);
+    recorded(repo, { outside_solo: true, blocks: 2 });
+    fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest(head, false) }] },
+      checks(null),
+      handOff,
+      statuses,
+    ]);
+    expect(automerge(repo, '--no-wait').code).toBe(0);
+    expect(record(repo).outside_solo).toBeUndefined();
+    expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
   test('refuses a head without a clean saved review, or without permission, and hands nothing off', () => {
     const repo = soloRepo();
     const head = git(repo, ['rev-parse', 'HEAD']);
@@ -390,6 +473,30 @@ describe('solo automerge and wait-merge', () => {
     await new Promise((done) => child.on('exit', done));
     expect(record(repo).waiter).toBeUndefined();
     expect(hook(stop(repo), home)?.reason).toContain('solo wait-merge 461');
+  });
+
+  test('a push after the handoff takes the PR off automerge instead of merging it unreviewed', () => {
+    const repo = soloRepo();
+    const home = scratch();
+    recorded(repo, { head: 'reviewed', via: 'label automerge' });
+    const calls = fakeGh([
+      { args: ['api', PR], replies: [{ stdout: rest('pushed-later', false) }] },
+      checks(null),
+      { args: ['api', '--method', 'DELETE'], replies: [{ stdout: [] }] },
+      statuses,
+      labels('automerge'),
+    ]);
+    const done = cli([
+      ...['--repo', repo, 'wait-merge', '461', '--require-check', 'gate', '--interval', '0.05'],
+    ]);
+    expect(done.code).toBe(1);
+    expect(JSON.parse(done.stdout)).toMatchObject({ status: 'head-moved' });
+    expect(JSON.parse(done.stdout).next).toContain('taken off automerge');
+    expect(calls()).toContainEqual([
+      ...['api', '--method', 'DELETE', 'repos/{owner}/{repo}/issues/461/labels/automerge'],
+    ]);
+    expect(readdirSync(handoffs(repo))).toEqual([]);
+    expect(hook(stop(repo), home)).toBeNull();
   });
 
   test('a label taken off ends the wait and the hold', () => {

@@ -7,7 +7,7 @@
 // the record and GitHub's own PR state; it never reads shell commands.
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { collectChecks, prApi, validatePr } from './delivery.ts';
+import { collectChecks, openPrs, prApi, validatePr } from './delivery.ts';
 import { commonDir, git, spawn, WorkflowError } from './git.ts';
 import { lastReviewedBefore, loadReview, reviewProblems, unreviewedCommits } from './reviews.ts';
 import { atomicJson, now } from './state.ts';
@@ -59,10 +59,26 @@ function handedOff(repo: string, pr: string): boolean {
   }
 }
 
+/** Removes a merge label through REST, as `solo automerge` added it. */
+function takeLabelOff(repo: string, pr: string, label: string) {
+  const api = prApi(pr);
+  return spawn(
+    [
+      'gh',
+      'api',
+      ...api.host,
+      '--method',
+      'DELETE',
+      `${api.repoPath}/issues/${prNumber(pr)}/labels/${encodeURIComponent(label)}`,
+    ],
+    repo,
+  );
+}
+
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 export type WaitResult = {
-  status: 'merged' | 'closed' | 'not-handed-off' | 'check-failed' | 'timeout';
+  status: 'merged' | 'closed' | 'not-handed-off' | 'head-moved' | 'check-failed' | 'timeout';
   pr: string;
   head?: string;
   merge_commit?: string;
@@ -123,6 +139,20 @@ export async function waitMerge(
           status: 'closed',
           next: 'The PR was closed without merging. Find out why before doing anything else with it.',
         };
+      } else if (typeof read(path).head === 'string' && read(path).head !== seen.head) {
+        // `solo automerge` handed off a reviewed head; a later push must not merge unreviewed.
+        const handed = read(path);
+        const off = String(handed.via ?? '').startsWith('label ')
+          ? takeLabelOff(repo, pr, String(handed.via).slice(6))
+          : spawn(['gh', 'pr', 'merge', pr, '--disable-auto'], repo);
+        done();
+        result = {
+          ...base,
+          status: 'head-moved',
+          next: off.code
+            ? `The PR head moved from the reviewed ${String(handed.head).slice(0, 12)} after the handoff, and taking it off automerge failed (${(off.stderr || off.stdout).trim().slice(0, 200)}): take it off by hand now, then review the new commits and run solo automerge again.`
+            : `The PR head moved from the reviewed ${String(handed.head).slice(0, 12)} after the handoff, so it was taken off automerge. Review the new commits, save the review, then run solo automerge again.`,
+        };
       } else if (!handedOff(repo, pr)) {
         done();
         result = {
@@ -139,7 +169,7 @@ export async function waitMerge(
             ...base,
             status: 'check-failed',
             failed_checks: failed,
-            next: 'Repair the failing check (Deliver Change, ci-repair), or take the PR off automerge; then wait again.',
+            next: 'Take the PR off automerge before pushing a fix (gh pr merge PR --disable-auto, or remove the label), so the unreviewed fix cannot merge. Then repair the check (Deliver Change, ci-repair), review the fix and run solo automerge again.',
           };
         else if (Date.now() + intervalS * 1000 > deadline)
           result = {
@@ -196,13 +226,31 @@ export async function automerge(repo: string, pr: string, options: AutomergeOpti
     reasons.push(
       below
         ? unreviewedCommits(below.head, below.after, seen.head)
-        : `no review is saved for the PR head ${seen.head}: review it and record it with \`solo review --reviewed-head ${seen.head}\``,
+        : `no review is saved for the PR head ${seen.head}: review it and record it with \`solo review --reviewed-head ${seen.head} --level <level> ...\``,
     );
   } else reasons.push(...reviewProblems(review));
-  const failed = seen.required_checks
-    .filter((check) => ['fail', 'cancel'].includes(String(check.bucket)))
-    .map((check) => String(check.name));
-  if (failed.length) reasons.push(`required checks failed: ${failed.join(', ')}`);
+  // Each required check has to be there, passed or still running: a failed one won't merge, and
+  // one missing never reports, so automerge would wait on nothing or merge without it.
+  const unfit = seen.required_checks
+    .filter((check) => !['pass', 'pending'].includes(String(check.bucket)))
+    .map((check) => `${String(check.name)} (${String(check.bucket)})`);
+  if (unfit.length) reasons.push(`required checks not passed or running: ${unfit.join(', ')}`);
+  // gh turns --auto into an immediate merge when GitHub would merge the PR now; that is a merge, so
+  // it goes through solo merge and its gates. A label workflow decides for itself.
+  const state = String((seen.pr as { mergeStateStatus?: string }).mergeStateStatus ?? '');
+  if (!options.label && ['CLEAN', 'UNSTABLE', 'HAS_HOOKS'].includes(state))
+    reasons.push(
+      `GitHub would merge this PR at once (${state.toLowerCase()}), since nothing makes it wait for the required checks: merge it with solo merge once they pass`,
+    );
+  // A stacked PR merges into the branch below it, not the base: merge the stack bottom up.
+  const prBase = (seen.pr as { baseRefName?: string }).baseRefName;
+  if (options.base && prBase && prBase !== options.base) {
+    const below = openPrs(repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
+    if (below)
+      reasons.push(
+        `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${options.base} and review its new head`,
+      );
+  }
   if (reasons.length) throw new WorkflowError(`Automerge blocked: ${reasons.join('; ')}`);
   const api = prApi(pr);
   const number = prNumber(pr);
@@ -240,8 +288,9 @@ export async function automerge(repo: string, pr: string, options: AutomergeOpti
     );
   const path = recordPath(repo, pr);
   const via = options.label ? `label ${options.label}` : 'auto-merge';
+  const { outside_solo: _outside, blocks: _blocks, ...prior } = read(path);
   atomicJson(path, {
-    ...read(path),
+    ...prior,
     ref: number,
     head: seen.head,
     via,

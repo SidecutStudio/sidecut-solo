@@ -16,6 +16,7 @@
 // Claude Code, Codex and Antigravity send different input shapes; `normal` reads all three. Session
 // notes live in ~/.sidecut/solo/sessions/. Any error lets the session carry on.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -211,12 +212,21 @@ function handoffReason(input) {
     }
   }
   const reasons = [];
+  // Antigravity has no prompt hook, so a new user message shows as a changed lastUserInput.
+  const asked =
+    input.host === 'antigravity'
+      ? createHash('sha256')
+          .update(String(input.prompt ?? ''))
+          .digest('hex')
+          .slice(0, 16)
+      : undefined;
   for (const [path, record] of records) {
-    if (!existsSync(path) || watched(record) || (record.blocks ?? 0) >= MAX_BLOCKS) continue;
+    const blocks = asked && record.asked !== asked ? 0 : (record.blocks ?? 0);
+    if (!existsSync(path) || watched(record) || blocks >= MAX_BLOCKS) continue;
     // Read again just before writing, so a waiter claimed meanwhile isn't wiped.
     const latest = readJson(path, undefined);
     if (!latest || watched(latest)) continue;
-    writeJson(path, { ...latest, blocks: (record.blocks ?? 0) + 1 });
+    writeJson(path, { ...latest, blocks: blocks + 1, ...(asked ? { asked } : {}) });
     const pr = record.ref;
     const host =
       input.host === 'claude-code'

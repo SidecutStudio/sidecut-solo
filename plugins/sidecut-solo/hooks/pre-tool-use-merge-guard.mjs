@@ -21,8 +21,8 @@ const GH = /(?:^|[\s;&|(`'"/])gh\b/;
 export function refusal(command) {
   if (!GH.test(command)) return '';
   // Turning auto-merge off hands nothing over; it is how a session stops a merge.
-  const lines = command.split('\n').filter((line) => MERGE.test(line));
-  if (!lines.length || lines.every((line) => /--disable-auto\b/.test(line))) return '';
+  const parts = command.split(/[\n;&|]+/).filter((part) => MERGE.test(part));
+  if (!parts.length || parts.every((part) => /--disable-auto\b/.test(part))) return '';
   return 'Sidecut Solo refuses a gh merge in this repo: merge with `solo merge <pr>`, or hand the PR to automerge with `solo automerge <pr>` (`--label <name>` where a label does the merge). Both check the saved review of the PR head, its required checks and your permission first; Deliver Change lists every step. If the command only mentions a merge in text, such as a commit message or PR body, put that text in a file and pass the file instead.';
 }
 

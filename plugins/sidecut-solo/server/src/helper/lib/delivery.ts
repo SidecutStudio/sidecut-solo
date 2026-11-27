@@ -369,7 +369,7 @@ type OpenPr = { number: number; head: string; base: string; sameRepo: boolean };
  * Open PRs in the PR's repository, as number, head branch, base branch and whether the head branch
  * lives in that repository (a fork's branch can share a name with one here). Null when unreadable.
  */
-function openPrs(repo: string, pr: string): OpenPr[] | null {
+export function openPrs(repo: string, pr: string): OpenPr[] | null {
   const api = prApi(pr);
   try {
     const pages = gh(repo, [

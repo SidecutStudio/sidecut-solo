@@ -20,6 +20,7 @@ export type Review = {
   notes?: string;
   level?: string;
   scope?: string;
+  branch?: string;
   deep_round?: number;
   at?: string;
 };
@@ -61,7 +62,12 @@ export function saveReview(repo: string, review: Review, cap = 3, base?: string,
   if (!(REVIEW_SCOPES as readonly string[]).includes(scope))
     problems.push('--scope must be whole or fix-diff');
   if (problems.length) throw new WorkflowError(`review: ${problems.join('; ')}`);
-  const below = reviewsBelow(repo, head, base);
+  // A change is its branch: reviews saved on another branch (a PR stacked below, or one merged
+  // since) belong to that change, even when their commits are this head's ancestors.
+  const branch = gitRun(repo, ['symbolic-ref', '--short', '-q', 'HEAD']).stdout.trim();
+  const below = reviewsBelow(repo, head, base).filter(
+    (item) => (item.review.branch ?? '') === branch,
+  );
   if (asked && scope === 'fix-diff') {
     // A fix diff alone is enough only after a review that left no blocker or major findings.
     const last = below[0];
@@ -89,6 +95,7 @@ export function saveReview(repo: string, review: Review, cap = 3, base?: string,
     blocking_findings: review.blocking_findings,
     notes: review.notes,
     ...(review.level ? { level: review.level, scope } : {}),
+    ...(branch ? { branch } : {}),
     ...(round ? { deep_round: round } : {}),
     at: now(),
   };
@@ -149,5 +156,5 @@ export function lastReviewedBefore(repo: string, head: string, base?: string) {
 /** The refusal for a review that sits below the head being merged. */
 export function unreviewedCommits(reviewed: string, after: number, head: string): string {
   const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
-  return `${after} commit${after === 1 ? '' : 's'} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? 'has' : 'have'} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
+  return `${after} commit${after === 1 ? '' : 's'} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? 'has' : 'have'} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head} --level <level> --scope fix-diff ...\``;
 }

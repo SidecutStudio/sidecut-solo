@@ -4,8 +4,8 @@
 
 ### Added
 
-- `solo automerge PR` hands a PR to GitHub auto-merge, or to a merge label with `--label automerge`, and then waits for the merge. It refuses until the PR head has a clean saved review, the merge is allowed and no required check has failed. It also records the handoff, so the turn guard knows exactly what this worktree is waiting on.
-- A hard cap on deep review rounds. `solo review` now takes `--level light|standard|deep`, and `--scope fix-diff` for a review of only the fix. It counts the deep reviews of the whole change on a PR and refuses one past `deep_review_rounds` (default 3, set it in `solo-workflow.toml`). The session then stops and gives the owner two choices: rethink the design, or accept the remaining minor findings. A fix-diff review is refused unless the review before it left no blocker or major findings.
+- `solo automerge PR` hands a PR to GitHub auto-merge, or to a merge label with `--label automerge`, and then waits for the merge. It refuses until the PR head has a clean saved review and the merge is allowed. It also refuses while any required check has failed or never reported, while the PR is stacked on another open PR, and when GitHub would merge at once instead of waiting (then `solo merge` is the way). It also records the handoff, so the turn guard knows exactly what this worktree is waiting on. If a commit lands on the PR after the handoff, the wait takes the PR off automerge instead of letting the unreviewed head merge.
+- A hard cap on deep review rounds. `solo review` now takes `--level light|standard|deep`, and `--scope fix-diff` for a review of only the fix. It counts the deep reviews of the whole change saved on the PR's branch and refuses one past `deep_review_rounds` (default 3, set it in `solo-workflow.toml`). The session then stops and gives the owner two choices: rethink the design, or accept the remaining minor findings. A fix-diff review is refused unless the review before it left no blocker or major findings.
 - Antigravity now runs the merge guard and the turn guard's Stop hook, the same as Claude Code and Codex.
 
 ### Changed

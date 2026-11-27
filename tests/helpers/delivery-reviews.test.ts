@@ -231,6 +231,20 @@ describe('deep review rounds', () => {
     expect(JSON.parse(save(repo, 'deep', '0').stdout).deep_rounds.used).toBe(1);
   }, 30_000);
 
+  test('a branch stacked on another counts only its own reviews, before and after that one merges', () => {
+    const { repo } = makeRepo();
+    git(repo, ['checkout', '-q', '-b', 'lower']);
+    for (let i = 0; i < 3; i++) {
+      fix(repo);
+      expect(save(repo, 'deep', '0').code).toBe(0);
+    }
+    git(repo, ['checkout', '-q', '-b', 'upper']);
+    fix(repo);
+    // The lower branch's clean review is not this change's earlier review.
+    expect(save(repo, 'deep', '0', 'fix-diff').stderr).toContain('no earlier review');
+    expect(JSON.parse(save(repo, 'deep', '0').stdout).deep_rounds.used).toBe(1);
+  }, 30_000);
+
   test('a fix-diff review needs an earlier review that left no blocker or major findings', () => {
     const { repo } = makeRepo();
     git(repo, ['checkout', '-q', '-b', 'feature']);

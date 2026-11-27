@@ -91,6 +91,14 @@ describe('merge guard hook', () => {
     });
   }
 
+  test('turning auto-merge off excuses only its own command, not one chained after it', () => {
+    for (const command of [
+      'gh pr merge 5 --disable-auto && gh pr merge 5 --squash --admin',
+      'gh pr merge 5 --disable-auto; gh api -X PUT repos/o/r/pulls/5/merge',
+    ])
+      expect(decision(guard(command, solo).out)).toBe('deny');
+  });
+
   test('a message that mentions a gh merge is refused too, with the way round it', () => {
     const { out } = guard('git commit -m "Stop gh pr merge in hooks"', solo);
     expect(decision(out)).toBe('deny');

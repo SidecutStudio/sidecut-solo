@@ -437,7 +437,7 @@ function reviewFrom(args: Parsed, repo: string, base?: string): object {
     const saved = loadReview(repo, named);
     if (saved) return saved;
     throw new WorkflowError(
-      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`,
+      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`,
     );
   }
   if (inline.length) return inlineReview(args);
@@ -448,7 +448,7 @@ function reviewFrom(args: Parsed, repo: string, base?: string): object {
   throw new WorkflowError(
     below
       ? `merge: ${unreviewedCommits(below.head, below.after, head)}`
-      : 'merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>',
+      : 'merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>',
   );
 }
 

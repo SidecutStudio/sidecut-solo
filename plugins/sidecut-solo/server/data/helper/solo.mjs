@@ -2716,7 +2716,10 @@ function saveReview(repo, review, cap = 3, base, asked = true) {
   if (!REVIEW_SCOPES.includes(scope))
     problems2.push("--scope must be whole or fix-diff");
   if (problems2.length) throw new WorkflowError(`review: ${problems2.join("; ")}`);
-  const below = reviewsBelow(repo, head, base);
+  const branch = gitRun(repo, ["symbolic-ref", "--short", "-q", "HEAD"]).stdout.trim();
+  const below = reviewsBelow(repo, head, base).filter(
+    (item) => (item.review.branch ?? "") === branch
+  );
   if (asked && scope === "fix-diff") {
     const last = below[0];
     if (last?.review.blocking_findings !== 0)
@@ -2741,6 +2744,7 @@ function saveReview(repo, review, cap = 3, base, asked = true) {
     blocking_findings: review.blocking_findings,
     notes: review.notes,
     ...review.level ? { level: review.level, scope } : {},
+    ...branch ? { branch } : {},
     ...round ? { deep_round: round } : {},
     at: now()
   };
@@ -2787,7 +2791,7 @@ function lastReviewedBefore(repo, head, base) {
 }
 function unreviewedCommits(reviewed, after, head) {
   const range = `${reviewed.slice(0, 12)}..${head.slice(0, 12)}`;
-  return `${after} commit${after === 1 ? "" : "s"} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? "has" : "have"} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head}\``;
+  return `${after} commit${after === 1 ? "" : "s"} after the reviewed head ${reviewed.slice(0, 12)} ${after === 1 ? "has" : "have"} no review: review ${range} (the fix diff), then record it with \`solo review --reviewed-head ${head} --level <level> --scope fix-diff ...\``;
 }
 
 // plugins/sidecut-solo/server/src/helper/lib/delivery.ts
@@ -3979,6 +3983,20 @@ function handedOff(repo, pr) {
     return true;
   }
 }
+function takeLabelOff(repo, pr, label) {
+  const api = prApi(pr);
+  return spawn(
+    [
+      "gh",
+      "api",
+      ...api.host,
+      "--method",
+      "DELETE",
+      `${api.repoPath}/issues/${prNumber(pr)}/labels/${encodeURIComponent(label)}`
+    ],
+    repo
+  );
+}
 var sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
   validatePr(pr);
@@ -4020,6 +4038,15 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
           status: "closed",
           next: "The PR was closed without merging. Find out why before doing anything else with it."
         };
+      } else if (typeof read(path).head === "string" && read(path).head !== seen.head) {
+        const handed = read(path);
+        const off = String(handed.via ?? "").startsWith("label ") ? takeLabelOff(repo, pr, String(handed.via).slice(6)) : spawn(["gh", "pr", "merge", pr, "--disable-auto"], repo);
+        done();
+        result = {
+          ...base,
+          status: "head-moved",
+          next: off.code ? `The PR head moved from the reviewed ${String(handed.head).slice(0, 12)} after the handoff, and taking it off automerge failed (${(off.stderr || off.stdout).trim().slice(0, 200)}): take it off by hand now, then review the new commits and run solo automerge again.` : `The PR head moved from the reviewed ${String(handed.head).slice(0, 12)} after the handoff, so it was taken off automerge. Review the new commits, save the review, then run solo automerge again.`
+        };
       } else if (!handedOff(repo, pr)) {
         done();
         result = {
@@ -4034,7 +4061,7 @@ async function waitMerge(repo, pr, require2, timeoutS, intervalS) {
             ...base,
             status: "check-failed",
             failed_checks: failed,
-            next: "Repair the failing check (Deliver Change, ci-repair), or take the PR off automerge; then wait again."
+            next: "Take the PR off automerge before pushing a fix (gh pr merge PR --disable-auto, or remove the label), so the unreviewed fix cannot merge. Then repair the check (Deliver Change, ci-repair), review the fix and run solo automerge again."
           };
         else if (Date.now() + intervalS * 1e3 > deadline)
           result = {
@@ -4070,11 +4097,24 @@ async function automerge(repo, pr, options) {
   if (!review) {
     const below = lastReviewedBefore(repo, seen.head, options.base);
     reasons.push(
-      below ? unreviewedCommits(below.head, below.after, seen.head) : `no review is saved for the PR head ${seen.head}: review it and record it with \`solo review --reviewed-head ${seen.head}\``
+      below ? unreviewedCommits(below.head, below.after, seen.head) : `no review is saved for the PR head ${seen.head}: review it and record it with \`solo review --reviewed-head ${seen.head} --level <level> ...\``
     );
   } else reasons.push(...reviewProblems(review));
-  const failed = seen.required_checks.filter((check) => ["fail", "cancel"].includes(String(check.bucket))).map((check) => String(check.name));
-  if (failed.length) reasons.push(`required checks failed: ${failed.join(", ")}`);
+  const unfit = seen.required_checks.filter((check) => !["pass", "pending"].includes(String(check.bucket))).map((check) => `${String(check.name)} (${String(check.bucket)})`);
+  if (unfit.length) reasons.push(`required checks not passed or running: ${unfit.join(", ")}`);
+  const state = String(seen.pr.mergeStateStatus ?? "");
+  if (!options.label && ["CLEAN", "UNSTABLE", "HAS_HOOKS"].includes(state))
+    reasons.push(
+      `GitHub would merge this PR at once (${state.toLowerCase()}), since nothing makes it wait for the required checks: merge it with solo merge once they pass`
+    );
+  const prBase = seen.pr.baseRefName;
+  if (options.base && prBase && prBase !== options.base) {
+    const below = openPrs(repo, pr)?.find((item) => item.sameRepo && item.head === prBase);
+    if (below)
+      reasons.push(
+        `PR ${pr} is stacked on PR ${below.number} (${prBase}): merge PR ${below.number} first, then retarget this one to ${options.base} and review its new head`
+      );
+  }
   if (reasons.length) throw new WorkflowError(`Automerge blocked: ${reasons.join("; ")}`);
   const api = prApi(pr);
   const number = prNumber(pr);
@@ -4112,8 +4152,9 @@ async function automerge(repo, pr, options) {
     );
   const path = recordPath(repo, pr);
   const via = options.label ? `label ${options.label}` : "auto-merge";
+  const { outside_solo: _outside, blocks: _blocks, ...prior } = read(path);
   atomicJson(path, {
-    ...read(path),
+    ...prior,
     ref: number,
     head: seen.head,
     via,
@@ -4787,7 +4828,7 @@ function reviewFrom(args, repo, base) {
     const saved2 = loadReview(repo, named);
     if (saved2) return saved2;
     throw new WorkflowError(
-      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`
+      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`
     );
   }
   if (inline.length) return inlineReview(args);
@@ -4796,7 +4837,7 @@ function reviewFrom(args, repo, base) {
   if (saved) return saved;
   const below = lastReviewedBefore(repo, head, base);
   throw new WorkflowError(
-    below ? `merge: ${unreviewedCommits(below.head, below.after, head)}` : "merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>"
+    below ? `merge: ${unreviewedCommits(below.head, below.after, head)}` : "merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>"
   );
 }
 function brief(repo, settings) {
