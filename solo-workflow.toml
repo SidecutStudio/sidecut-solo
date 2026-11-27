@@ -5,6 +5,7 @@ merge_method = "squash"
 # check stays listed because sidecut-check's SOLO_REQUIRED rule expects it.
 required_checks = ["gate", "check"]
 worktrees = "when-overlapping"
+voice_guide = "VOICE.md"
 # Generated from plugins/sidecut-solo/agents/*.md. Never edit by hand; change the .md source,
 # run node scripts/codex-agents.ts and commit the regenerated files with it.
 protected_paths = [

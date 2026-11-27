@@ -3,10 +3,14 @@ name: solo-show-usage
 description: "Shows which skills, tools and agents ran, what they cost and whether usage is still being recorded. Use when the user asks about usage, telemetry, cost or which skills and plugins get used. Not for fixing a repeated mistake (use solo-prevent-mistake)."
 argument-hint: "[days]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
   - mcp__plugin_sidecut-solo_solo__get_usage
 ---
 
 # Show usage
+
+Usage is host-wide. If the user scopes the report to a project, read the settings following `server/data/settings.md` from the loaded plugin root. A usage report needs no setup offer.
 
 Show the user what ran on their machine and what it cost, then explain it in plain words. Everything comes from local logs, and nothing is sent anywhere.
 

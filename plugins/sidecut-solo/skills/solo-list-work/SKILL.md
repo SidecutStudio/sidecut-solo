@@ -3,13 +3,17 @@ name: solo-list-work
 description: "Shows unfinished work and what could be lost. Use when the user asks about branches, project copies, open PRs or cleanup safety. Not for cleanup itself (use solo-deliver-change)."
 argument-hint: "[branch, PR or question]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" inventory *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" merged *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
   - mcp__plugin_sidecut-solo_solo__get_work_state
   - mcp__plugin_sidecut-solo_solo__list_merged_branches
 ---
 
 # List work
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Inspect the project's current work without changing it. Explain ownership, unfinished outcomes and cleanup risks in plain words.
 

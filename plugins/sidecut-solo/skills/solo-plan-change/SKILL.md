@@ -9,6 +9,8 @@ allowed-tools:
 
 # Plan change
 
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
+
 Make the next action clear without making the user manage a process. Keep plans proportional to the decisions and risks they must carry.
 
 ## Steps

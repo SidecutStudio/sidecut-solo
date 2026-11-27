@@ -7,3 +7,5 @@ Start with the outcome. Explain the reasoning when it helps a person make a deci
 For skills, put prerequisites, boundaries, and recovery where they apply. Make success verifiable when the task requires proof. Do not repeat the description, invent a role, or add boilerplate just to fill a template. Keep factual claims grounded, separate verified results from assumptions, and never invent a test or an outcome.
 
 Avoid hype, forced humour, empty reassurances, and em dashes. Use specific feedback instead of corporate filler. A little personality is welcome when it fits; precision matters more than cleverness.
+
+For Sidecut product copy, lead with the capability someone would show a friend. Use impressive technical specifics as proof and keep pull request counts, test counts and safety checks out of the pitch. Write headlines and openings in the reader's language, then explain the named parts and what they do immediately below.

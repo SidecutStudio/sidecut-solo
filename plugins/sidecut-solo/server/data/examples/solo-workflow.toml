@@ -9,8 +9,16 @@ review_model = "sonnet"          # Claude Code model for standard reviews
 review_effort = "medium"         # low | medium | high, both hosts
 deep_review_rounds = 3           # deep reviews of the whole change before solo review refuses another
 protected_paths = ["dist/", "vendor/"]
+# voice_guide = "docs/voice.md"   # relative to the repo root, or an absolute path in personal settings
+# Use voice_guide = "" for Solo's general writing guidance.
 
 [checks]
 test = "npm test"
 lint = "npm exec --no -- biome check ."
 types = "npm exec --no -- tsc --noEmit"
+
+# Optional, only for services the project uses. A local override of "off" disables a service.
+# [integrations]
+# issue_tracker = "Your issue tracker"
+# task_board = "Your task board"
+# ci = "Your CI service or runner guide"

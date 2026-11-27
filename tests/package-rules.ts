@@ -135,6 +135,8 @@ export async function packageErrors(root: string): Promise<string[]> {
       else if (description.length > 400) errors.push(`${name}: description over 400`);
       const own = files.filter((f) => f.startsWith(`skills/${name}/`) && f.endsWith('.md'));
       const named = new Set<string>();
+      // The shared project setup step calls config before the skill's own commands.
+      if (text.includes('`server/data/settings.md`')) named.add('config');
       const namedTools = new Set<string>();
       for (const file of own) {
         const body = await readFile(join(root, file), 'utf8');

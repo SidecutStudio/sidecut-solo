@@ -10,7 +10,7 @@ Look at accepted review fixes, corrective commits, documented solutions and rule
 
 ## Scaffold
 
-Draft missing guidance at its existing documented location, or use root `CODING_STANDARDS.md` and `REVIEW.md` when the project has no established location. A repo whose own checks limit its top-level files, such as a plugin repo checked by `sidecut-check`, takes `docs/coding-standards.md` and `docs/review.md` instead. Keep code conventions in the standards and review behavior in the review guidance. Leave existing docs intact during scaffolding. If there is too little evidence, report the gap instead of filling a template with generic rules.
+Draft missing guidance at its existing documented location, or use root `CODING_STANDARDS.md` and `REVIEW.md` when the project has no established location. If its own checks limit top-level files, use `docs/coding-standards.md` and `docs/review.md`. Keep code conventions in the standards and review behavior in the review guidance. Leave existing docs intact during scaffolding. If there is too little evidence, report the gap instead of filling a template with generic rules.
 
 In the repository's main instructions, add a short pointer saying when each new doc applies. Wire confirmed reviewer configs through their documented pointer or include mechanism when supported. Preserve existing instructions and skip unused reviewers. If instructions are generated, update their owning source only when that change is in scope.
 

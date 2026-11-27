@@ -11,6 +11,8 @@ allowed-tools:
 
 # Build change
 
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
+
 Make the requested change using the project's own patterns and checks.
 
 ## Steps
@@ -27,7 +29,7 @@ Make the requested change using the project's own patterns and checks.
 10. Use solo-review-code at the level `solo user-facing` suggests. Verify review claims before applying fixes.
 11. Review the changed head after fixes. If starting from a design, follow [from-a-design.md](references/from-a-design.md) and report intentional differences.
 12. Commit only this task's changes using repository conventions. Use `solo push` to confirm the remote tip. Open a PR when the repository uses them.
-13. Use solo-configure-project for a new repository's first PR. Use solo-deliver-change whenever merging is requested or `merge = "when-green"` permits it.
+13. Use solo-deliver-change whenever merging is requested or `merge = "when-green"` permits it. Carry forward the setup decision from the start of the task.
 14. With `merge = "ask"`, ask once when the result is ready unless permission already exists. Keep merge and publication permission separate. In a hands-off task, `server/data/hands-off.md` from the loaded plugin root replaces these questions.
 
 ## Rules

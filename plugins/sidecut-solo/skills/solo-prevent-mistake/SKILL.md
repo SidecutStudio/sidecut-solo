@@ -2,9 +2,14 @@
 name: solo-prevent-mistake
 description: "Removes the cause of a recurring project mistake. Use when the same wrong command, missed check or instruction conflict keeps happening. Not for a single unexplained failure (use solo-diagnose-problem)."
 argument-hint: "[recurring problem]"
+allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Prevent mistake
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Fix one repeated problem at its cause and demonstrate the result. Prefer a check or setting that makes the correct action easy.
 

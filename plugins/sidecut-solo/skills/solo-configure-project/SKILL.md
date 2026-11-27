@@ -13,6 +13,10 @@ allowed-tools:
 
 Keep project settings accurate without turning routine maintenance into first-time onboarding.
 
+## First run
+
+Resolve the actual Git checkout and run `solo config`. If called by another skill and `setup_needed` is true, use [first-run.md](references/first-run.md) first, then return to that skill with the answer and effective settings. Use the same flow for an explicit setup request in a fresh checkout. For an already configured project, or an explicit audit, use the maintenance steps below.
+
 ## Steps
 
 1. Read repository instructions and run `solo config` and `solo retired-names`. Note settings sources, values, problems and retired Solo names. Read TOML directly if the helper cannot run. Confirm the repository, active checkout and ref, and settings paths before proposing changes. Follow [preflight.md](references/preflight.md) for an audit, missing capabilities or a separate write checkout.
@@ -25,7 +29,7 @@ Keep project settings accurate without turning routine maintenance into first-ti
 7. Show one comparison table containing saved values, observed values and instruction changes. Ask only unresolved policy decisions that change the setup. Follow `server/data/user-input.md` from the loaded plugin root.
 8. Reuse existing merge and worktree choices. Without a preference, use `merge = "ask"` and `worktrees = "when-overlapping"`.
 9. Update only changed settings in `solo-workflow.toml` and preserve comments. Follow [project-settings.md](examples/project-settings.md).
-10. Create `solo-workflow.local.toml` only on request and ignore it in Git. Never copy personal overrides into committed settings.
+10. Save personal overrides only with the user's consent. Keep `solo-workflow.local.toml` out of Git. Use `~/.config/solo/preferences.toml` only for personal defaults the user wants across projects. Never copy personal overrides into committed settings.
 11. Add or refresh only the Solo instruction block using [agents-section.md](references/agents-section.md). Preserve every unrelated instruction.
     Replace each retired Solo plugin, repository, helper path or skill name from step 1 with the current name it gives.
 12. Run `solo config` and `solo retired-names` again and confirm expected files without problems or retired names. Run each configured check once. Report failures without weakening settings.
@@ -53,6 +57,7 @@ Report changed values, instruction updates, command results, unset settings and 
 
 | Read | When |
 | --- | --- |
+| [first-run.md](references/first-run.md) | Offer setup to someone working in an unconfigured project. |
 | [preflight.md](references/preflight.md) | Diagnosing setup and checking the target checkout before editing |
 | [agents-section.md](references/agents-section.md) | Maintain repository instruction wiring. |
 | [codex-agents.md](references/codex-agents.md) | Inspect and install missing project profiles. |

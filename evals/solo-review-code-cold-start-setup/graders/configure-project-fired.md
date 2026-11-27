@@ -1,7 +1,8 @@
 ---
 type: tool_used
 tool: Skill
-input_match: "sidecut-solo:solo-compare-plugin"
+input_match: "sidecut-solo:solo-configure-project"
 min: 1
+max: 1
 arm: with-only
 ---

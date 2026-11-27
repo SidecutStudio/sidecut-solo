@@ -10,6 +10,8 @@ allowed-tools:
 
 # Test behavior
 
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
+
 Use the interface a customer or operator actually touches. Check a specific promise or explore a real journey from a plausible starting state.
 
 ## Steps

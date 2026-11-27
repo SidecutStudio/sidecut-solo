@@ -2,9 +2,14 @@
 name: solo-choose-approach
 description: "Compares workable approaches for a grounded recommendation. Use when the user asks what to do or which option fits. Not for fact gathering (use solo-research-topic)."
 argument-hint: "[idea or decision]"
+allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Choose approach
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Turn an open question into a recommendation grounded in this project. Keep settled choices unless new evidence breaks a constraint.
 

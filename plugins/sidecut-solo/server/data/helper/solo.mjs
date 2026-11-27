@@ -910,6 +910,7 @@ import { join as join5 } from "node:path";
 
 // plugins/sidecut-solo/server/src/helper/lib/config.ts
 import { existsSync as existsSync4, lstatSync as lstatSync2, readFileSync as readFileSync3, realpathSync as realpathSync2 } from "node:fs";
+import { homedir as homedir2 } from "node:os";
 import { join as join4, resolve as resolve2 } from "node:path";
 
 // node_modules/smol-toml/dist/error.js
@@ -2110,6 +2111,16 @@ var MERGE_POLICIES = ["ask", "when-green", "never"];
 var MERGE_METHODS = ["squash", "merge", "rebase"];
 var WORKTREE_POLICIES = ["always", "when-overlapping", "never"];
 var REVIEW_EFFORTS = ["low", "medium", "high"];
+var INTEGRATIONS = ["issue_tracker", "task_board", "ci"];
+var PERSONAL_KEYS = /* @__PURE__ */ new Set([
+  "worktrees",
+  "review",
+  "review_model",
+  "codex_review_model",
+  "review_effort",
+  "deep_review_rounds",
+  "voice_guide"
+]);
 var KEYS = {
   base_branch: "string",
   checks: "table",
@@ -2122,7 +2133,9 @@ var KEYS = {
   review_model: "string",
   codex_review_model: "string",
   review_effort: "string",
-  deep_review_rounds: "number"
+  deep_review_rounds: "number",
+  voice_guide: "string",
+  integrations: "table"
 };
 var DEFAULTS = {
   merge: "ask",
@@ -2149,16 +2162,25 @@ function kindOf(value) {
   }
   return "other";
 }
-function problems(data, name) {
+function problems(data, name, personal) {
   const found = [];
   for (const [key, value] of Object.entries(data)) {
-    const kind = KEYS[key];
+    const kind = Object.hasOwn(KEYS, key) ? KEYS[key] : void 0;
     if (!kind) found.push([key, `${name}: unknown key '${key}'`]);
-    else if (kindOf(value) !== kind) found.push([key, `${name}: '${key}' must be a ${kind}`]);
+    else if (personal && !PERSONAL_KEYS.has(key)) {
+      found.push([key, `${name}: '${key}' belongs in repository settings`]);
+    } else if (kindOf(value) !== kind) found.push([key, `${name}: '${key}' must be a ${kind}`]);
     else if (CHOICES[key] && !CHOICES[key].includes(value)) {
       found.push([key, `${name}: '${key}' must be one of ${CHOICES[key].join(", ")}`]);
     } else if (key === "checks" && !Object.values(value).every((v) => typeof v === "string")) {
       found.push([key, `${name}: every [checks] entry must be a command string`]);
+    } else if (key === "integrations" && !Object.entries(value).every(
+      ([setting, service]) => INTEGRATIONS.includes(setting) && typeof service === "string" && service.trim()
+    )) {
+      found.push([
+        key,
+        `${name}: [integrations] accepts nonempty strings for ${INTEGRATIONS.join(", ")}`
+      ]);
     } else if (kind === "number" && !(Number.isInteger(value) && value >= 1)) {
       found.push([key, `${name}: '${key}' must be a whole number of at least 1`]);
     } else if (kind === "list" && !value.every((v) => typeof v === "string")) {
@@ -2167,32 +2189,41 @@ function problems(data, name) {
   }
   return found;
 }
-function repoRoot(repo) {
+function gitRoot(repo) {
   try {
     return realpathSync2(git(repo, ["rev-parse", "--show-toplevel"]));
   } catch {
-    return resolve2(repo);
+    return void 0;
   }
+}
+function repoRoot(repo) {
+  return gitRoot(repo) ?? resolve2(repo);
 }
 function present(path) {
   return existsSync4(path) || Boolean(lstatSync2(path, { throwIfNoEntry: false })?.isSymbolicLink());
 }
 function load(repo) {
-  const root2 = repoRoot(repo);
-  const merged = {};
+  const gitRepo = gitRoot(repo);
+  const root2 = gitRepo ?? resolve2(repo);
+  const preferences = join4(homedir2(), ".config", "solo", "preferences.toml");
+  const merged = /* @__PURE__ */ Object.create(null);
   const files = [];
   const found = [];
-  for (const name of LAYERS) {
-    if (!present(join4(root2, name))) continue;
+  let userPreferences;
+  for (const name of [preferences, ...LAYERS]) {
+    const personal = name === preferences;
+    const path = personal ? name : join4(root2, name);
+    if (!present(path)) continue;
     let data;
     try {
-      data = parse(readFileSync3(join4(root2, name), "utf8"));
+      data = parse(readFileSync3(path, "utf8"));
     } catch (error) {
       found.push(`${name}: can't be read (${error.message})`);
       continue;
     }
-    files.push(name);
-    const issues = problems(data, name);
+    if (personal) userPreferences = name;
+    else files.push(name);
+    const issues = problems(data, name, personal);
     found.push(...issues.map(([, message]) => message));
     const bad = new Set(issues.map(([key]) => key));
     for (const [key, value] of Object.entries(data)) {
@@ -2202,9 +2233,18 @@ function load(repo) {
     }
   }
   const defaults = Object.fromEntries(Object.entries(DEFAULTS).filter(([key]) => !(key in merged)));
-  const result = { root: root2, files, config: merged, defaults, problems: found };
-  if (!files.length) {
-    result.hint = "No settings file; defaults apply. Use Sidecut Solo Setup to save some.";
+  const setupNeeded = Boolean(gitRepo && !files.length && !userPreferences && !found.length);
+  const result = {
+    root: root2,
+    files,
+    setup_needed: setupNeeded,
+    config: merged,
+    defaults,
+    problems: found
+  };
+  if (userPreferences) result.user_preferences = userPreferences;
+  if (setupNeeded) {
+    result.hint = "No Solo settings found. Offer setup through solo-configure-project before acting.";
   }
   return result;
 }
