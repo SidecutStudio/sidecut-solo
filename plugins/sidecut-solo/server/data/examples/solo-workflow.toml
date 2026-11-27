@@ -7,6 +7,7 @@ review = "auto"                  # auto | deep | light
 review_model = "sonnet"          # Claude Code model for standard reviews
 # codex_review_model = "gpt-6-luna"  # Codex model for standard reviews, one the host lists; unset keeps the parent's
 review_effort = "medium"         # low | medium | high, both hosts
+deep_review_rounds = 3           # deep reviews of the whole change before solo review refuses another
 protected_paths = ["dist/", "vendor/"]
 
 [checks]

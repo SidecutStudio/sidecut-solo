@@ -95,11 +95,11 @@ The usage tool provides an MCP App dashboard where supported. Terminal clients r
 
 ## Hooks and roles
 
-Separate Claude Code and Codex hook files register the same installed scripts with each host's event names, and root `hooks.json` registers the skill-log hook for Gemini/Antigravity. Codex requires user trust before running hooks.
+Separate Claude Code and Codex hook files register the same installed scripts with each host's event names, and root `hooks.json` registers the skill-log hook, the merge guard and the turn guard's Stop hook for Gemini/Antigravity. Codex requires user trust before running hooks.
 
-The merge guard rejects admin merges in configured repositories, and any other merge run outside the helper unless it names a head with a clean saved review (`gh pr merge --match-head-commit SHA`). It reads command data rather than descriptions, follows a `cd` earlier in the same command, and does not enforce a sandbox boundary.
+In configured repositories the merge guard refuses any shell command whose text names a gh merge (`pr merge`, a merge or auto-merge mutation, a REST merge path), except turning auto-merge off, and sends it to `solo merge` or `solo automerge`. It is a word check on the command, not a shell reader: a message that mentions a merge is refused too and goes in a file instead. It reads the session's folder and does not enforce a sandbox boundary.
 
-The turn guard hooks record a command that hands a PR to automerge (a merge label or GitHub auto-merge) under the Git common directory at `solo-handoffs/`, and at Stop refuse to end the turn while one of the session's records has no live `solo wait-merge` waiting on it. They give way after two refusals in a row, until the next prompt. Only `wait-merge` reads GitHub and removes a record, once the PR merges, closes or is no longer handed off. The same hooks note the Solo skills a prompt names and the ones the session loads, in `~/.sidecut/solo/sessions/`, and raise once each named skill that never loaded. Antigravity runs neither guard yet.
+`solo automerge` is the one way to hand a PR to a merge label or GitHub auto-merge. It refuses until the PR head has a clean saved review and permission holds, and while a required check has failed or never reported, the PR is stacked on another open PR, or GitHub would merge it at once rather than wait, then makes the handoff, writes a record for the worktree under the Git common directory at `solo-handoffs/` and waits like `wait-merge`. A wait on a recorded handoff whose PR head moved off the reviewed one takes the PR off automerge and says to review the new commits. At Stop the turn guard refuses to end the turn while a record of this worktree has no live `wait-merge` inside the wait it announced. It also asks GitHub about a pushed branch's open PR: a merge label or auto-merge with no record was set outside Solo, so it gets a record and the session is sent to `solo automerge`; a PR that merged, closed or left automerge clears its record. No shell text is read. The guard gives way after two refusals in a row, until the next prompt, and lets the session carry on when GitHub can't answer. The same hooks note the Solo skills a prompt names and the ones the session loads, in `~/.sidecut/solo/sessions/`, and raise once each named skill that never loaded; Antigravity has no prompt hook for that part.
 
 A malformed or unavailable hook input fails open without becoming merge permission. Helper gates remain responsible for delivery checks and permission.
 
@@ -117,7 +117,7 @@ Claude deep review uses server/data/workflows/review-change.js. Codex uses nativ
 
 Read solo-workflow.toml and optional solo-workflow.local.toml. Local values override individual keys; check commands merge by name.
 
-Settings cover the base branch, checks, merge policy, method, required checks, worktrees, protected paths and the review level, models and effort. Report malformed or unknown settings without weakening them.
+Settings cover the base branch, checks, merge policy, method, required checks, worktrees, protected paths, the review level, models and effort, and the deep review round cap. Report malformed or unknown settings without weakening them.
 
 Discover unset facts from the current repository. Keep personal overrides ignored. Modify protected generated files through their source and documented generator.
 
@@ -133,6 +133,7 @@ A hands-off task ([hands-off.md](hands-off.md)) takes the recommended option at 
 | start, resume, checkpoint, reconcile, run | Preserve recoverable task state and track bounded command outcomes. |
 | user-facing | Identify visible changes, whether rendered design review is needed, and the suggested review level. |
 | push, checks, authorization, gate, review, merge | Confirm remote tips, reviewed heads, required checks and delivery permission. `review` saves one commit's review, which `merge` reads; `merge` refuses commits after the reviewed head and a PR stacked on another open PR, and names the PRs stacked on the one it merged. |
+| automerge | Hand a PR with a clean saved review to a merge label or GitHub auto-merge, record the handoff and wait for it. |
 | wait-merge | Wait for a PR handed to automerge to merge, close or fail a required check, then say what comes next. While it runs, the turn guard lets the turn end. |
 | brief | Print the delivery paragraph a parent pastes into a sub-agent's brief. |
 | worktree, cleanup, delete-merged | Create owned workspaces and remove only proven-preserved task resources. |
@@ -176,7 +177,7 @@ Validate findings and try to disprove serious claims. Size review to the change:
 
 Each host sets the reviewer's model and effort explicitly: Claude Code passes `review_model` and `review_effort`; Codex passes `review_effort` as `reasoning_effort` and `codex_review_model` when set; Gemini/Antigravity passes `Model: "flash"` on standard review and `inherit` on deep. The review record names what ran.
 
-Every changed head requires another review. Scoped re-review requires a committed review other than a multi-agent one, preserved ancestry and an unchanged merge base; after a deep review it also requires that review to have found no blocker or major findings. A scoped re-review covers the fix diff at the level the helper suggests for it. A scoped review with blocker or major findings sends the whole change back to full review. Only deep reviews of the whole change count as full deep rounds: if the third still has blocker or major findings, the user decides on a fourth, and minors left after the cap are reported as known gaps or follow-ups.
+Every changed head requires another review. Scoped re-review requires a committed review other than a multi-agent one, preserved ancestry and an unchanged merge base; after a deep review it also requires that review to have found no blocker or major findings. A scoped re-review covers the fix diff at the level the helper suggests for it. A scoped review with blocker or major findings sends the whole change back to full review. Each saved review states its level and whether it covered the whole change or a fix diff; `solo review` refuses a fix-diff review unless the review before it left no blocker or major findings. Only deep reviews of the whole change count as deep rounds, per change: reviews saved on the same branch, below the head and not already on the base branch. Past `deep_review_rounds` (default 3) `solo review` refuses another: the session stops and gives the owner two choices, rethink the design or accept the remaining minor findings, which are then reported as known gaps or follow-ups.
 
 Visible changes require rendered design review unless excluded by the user or unavailable. State missing design coverage at the report's start with its reason.
 

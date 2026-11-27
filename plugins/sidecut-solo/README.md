@@ -99,7 +99,7 @@ Solo is mostly instructions. The parts that execute are:
 
 - **The helper**, `server/data/helper/solo`: a small shell launcher that runs the bundled Node.js file (`solo.mjs`) with no dependencies to install. It reads Git and GitHub with your existing sign-in and does the pushes, merges and deletions the skills ask for, after its own checks.
 - **A read-only MCP server** with views of settings, work state, PR checks, merged branches, user-facing changes and usage.
-- **Two hooks.** A merge guard refuses `gh pr merge --admin` in projects that have Solo settings; it guards against mistakes and isn't a security boundary. The other writes the skill log below.
+- **Hooks.** In projects with Solo settings, a merge guard sends every merge through the helper, and a turn guard keeps the session going until a PR it handed to automerge has merged, reading GitHub so a handoff made by hand is caught too. They guard against mistakes and aren't a security boundary. Another writes the skill log below.
 
 Codex runs hooks only after you trust them.
 

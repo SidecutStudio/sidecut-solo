@@ -12,5 +12,28 @@
         ]
       }
     ]
+  },
+  "merge-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./hooks/pre-tool-use-merge-guard.mjs",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "turn-guard": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./hooks/stop-turn-guard.mjs",
+        "timeout": 5
+      }
+    ]
   }
 }

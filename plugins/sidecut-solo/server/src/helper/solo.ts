@@ -22,13 +22,20 @@ import {
 import { docsCheck } from './lib/docs.ts';
 import { run } from './lib/execution.ts';
 import { freshRemoteState, inventory, mergedBranches, WorkflowError } from './lib/git.ts';
-import { waitMerge } from './lib/handoff.ts';
+import { automerge, waitMerge } from './lib/handoff.ts';
 import { retiredNames } from './lib/names.ts';
 import { pluginRoot } from './lib/paths.ts';
 import { textReport } from './lib/present.ts';
 import { qaCommand } from './lib/qa.ts';
 import type { ReviewPolicy } from './lib/review.ts';
-import { lastReviewedBefore, loadReview, saveReview, unreviewedCommits } from './lib/reviews.ts';
+import {
+  lastReviewedBefore,
+  loadReview,
+  REVIEW_LEVELS,
+  REVIEW_SCOPES,
+  saveReview,
+  unreviewedCommits,
+} from './lib/reviews.ts';
 import { defaultTask, Store, type Task } from './lib/state.ts';
 import { userFacing } from './lib/surface.ts';
 import {
@@ -138,11 +145,17 @@ const COMMANDS: Record<string, Spec> = {
     },
   },
   review: {
-    help: 'Save the review of one commit, which merge and the merge guard read',
+    help: 'Save the review of one commit, which merge and automerge read; refuses a deep round past deep_review_rounds',
     options: {
       'reviewed-head': { kind: 'string', required: true, about: 'full SHA the review covered' },
       reviewer: { kind: 'string', required: true, choices: ['same-agent', 'independent', 'user'] },
       'review-notes': { kind: 'string', required: true, about: 'what was reviewed and found' },
+      level: { kind: 'string', required: true, choices: REVIEW_LEVELS },
+      scope: {
+        kind: 'string',
+        choices: REVIEW_SCOPES,
+        about: 'whole change (default) or only the fix diff since the last review',
+      },
       'blocking-findings': {
         kind: 'string',
         required: true,
@@ -172,6 +185,22 @@ const COMMANDS: Record<string, Spec> = {
         about: 'unresolved blocker or major findings; required inline',
       },
       method: { kind: 'string', choices: MERGE_METHODS },
+      ...AUTHORIZATION,
+      ...REQUIRE,
+    },
+    positionals: ['pr'],
+  },
+  automerge: {
+    help: 'Hand the PR to automerge once its head has a clean saved review, record it and wait for the merge',
+    options: {
+      label: {
+        kind: 'string',
+        about: 'merge label a workflow acts on, such as automerge; without it, GitHub auto-merge',
+      },
+      method: { kind: 'string', choices: MERGE_METHODS },
+      'no-wait': { kind: 'flag', about: 'hand off and return; run wait-merge next' },
+      timeout: { kind: 'string', about: 'seconds to wait before giving up (default 540)' },
+      interval: { kind: 'string', about: 'seconds between reads (default 30)' },
       ...AUTHORIZATION,
       ...REQUIRE,
     },
@@ -408,7 +437,7 @@ function reviewFrom(args: Parsed, repo: string, base?: string): object {
     const saved = loadReview(repo, named);
     if (saved) return saved;
     throw new WorkflowError(
-      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`,
+      `merge: no review is saved for ${named}: save it with \`solo review --reviewed-head ${named} --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>\`, or give those three on merge too`,
     );
   }
   if (inline.length) return inlineReview(args);
@@ -419,7 +448,7 @@ function reviewFrom(args: Parsed, repo: string, base?: string): object {
   throw new WorkflowError(
     below
       ? `merge: ${unreviewedCommits(below.head, below.after, head)}`
-      : 'merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>',
+      : 'merge: needs a review: `solo review --reviewed-head <sha> --reviewer <kind> --level <level> --review-notes <text> --blocking-findings <n>` first, or the same four on merge, or --review <file>',
   );
 }
 
@@ -431,10 +460,10 @@ function brief(repo: string, settings: ReturnType<typeof load>['config']): strin
     : "the base branch's protection rules";
   const policy = settings.merge ?? DEFAULTS.merge;
   return [
-    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never raw \`gh pr merge\` or a \`gh api\` merge: in this repo the merge guard refuses those without a saved review.`,
-    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --review-notes <text> --blocking-findings <n>\`. Any commit after it, a fix included, needs its own review first.`,
+    `Deliver through the Sidecut Solo helper, \`${solo}\` (add \`--repo <worktree>\` when running elsewhere), never a raw gh merge, auto-merge or merge label: in this repo the merge guard refuses gh merges and the turn guard catches a handoff made outside it.`,
+    `Push with \`solo push\`, then record the review of that head with \`solo review --reviewed-head <full sha> --reviewer same-agent|independent|user --level light|standard|deep --review-notes <text> --blocking-findings <n>\` (\`--scope fix-diff\` for a review of only the fix after a review that left no blocker or major findings). Any commit after it, a fix included, needs its own review first. After ${settings.deep_review_rounds ?? DEFAULTS.deep_review_rounds} deep rounds the helper refuses another: stop and report to the owner.`,
     `Run \`solo checks <pr> --reviewed-head <full sha>\`: every required check (${checks}) must pass on that exact head, and missing, queued, skipped, cancelled or failed are not passes.`,
-    `Merge with \`solo merge <pr>\` (merge policy: ${policy}; it refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
+    `Merge with \`solo merge <pr>\`, or hand it to automerge with \`solo automerge <pr>\` (merge policy: ${policy}; merge refuses a stacked PR until the one below it merges). After a merge or release, wait until the provider confirms it before reporting or going idle.`,
     'Never skip Git hooks (--no-verify). The brief above says whether proposing or making follow-ups is in scope; if it says nothing, report them and leave them undone.',
     `Repo: ${repo}`,
   ].join(' ');
@@ -494,7 +523,10 @@ async function main(argv: string[]): Promise<number> {
   const explicitTask = leading.task ?? later.task;
   const loaded = load(repo);
   const settings = loaded.config;
-  if (loaded.problems.length && ['checks', 'merge', 'gate', 'authorization'].includes(command)) {
+  if (
+    loaded.problems.length &&
+    ['checks', 'merge', 'automerge', 'gate', 'authorization', 'review'].includes(command)
+  ) {
     // A broken settings file must not quietly drop a rule such as merge = "never".
     throw new WorkflowError(`fix Sidecut Solo settings first: ${loaded.problems.join('; ')}`);
   }
@@ -512,6 +544,25 @@ async function main(argv: string[]): Promise<number> {
       publicationEffect: (args['publication-effect'] as string) ?? 'unknown',
       hostScope: (args['host-scope'] as string) ?? 'unknown',
     });
+  /** What still stops a merge the user asked for; one refusal names them all. */
+  const mergeProblems = (resolved: ReturnType<typeof permission>) => {
+    if (resolved.merge_vetoed)
+      throw new WorkflowError('repo settings set merge = "never"; configuration veto');
+    const problems: string[] = [];
+    if (resolved.missing_user_authorizations.includes('merge'))
+      problems.push('the user has not allowed this merge (--authorized)');
+    if (resolved.missing_user_authorizations.includes('publication'))
+      problems.push(
+        'merging publishes a release the user has not allowed (--publication-authorized)',
+      );
+    if (resolved.publication_effect === 'unknown')
+      problems.push('inspect what merging triggers first (--publication-effect none or automatic)');
+    if (resolved.host_scope !== 'allowed')
+      problems.push(
+        `host permission scope is ${resolved.host_scope.replace('_', ' ')}; use the native tool approval flow (--host-scope)`,
+      );
+    return problems;
+  };
   const positional = (index: number) => args._[index] as string;
   let result: unknown;
   switch (command) {
@@ -604,7 +655,16 @@ async function main(argv: string[]): Promise<number> {
       result = retiredNames(repo);
       break;
     case 'review':
-      result = saveReview(repo, inlineReview(args));
+      result = saveReview(
+        repo,
+        {
+          ...inlineReview(args),
+          level: args.level as string,
+          scope: args.scope as string | undefined,
+        },
+        settings.deep_review_rounds ?? DEFAULTS.deep_review_rounds,
+        settings.base_branch,
+      );
       break;
     case 'brief':
       process.stdout.write(`${brief(repo, settings)}\n`);
@@ -616,6 +676,18 @@ async function main(argv: string[]): Promise<number> {
         required,
         args['reviewed-head'] as string | undefined,
       );
+      break;
+    case 'automerge':
+      result = await automerge(repo, positional(0), {
+        label: args.label as string | undefined,
+        method: (args.method as string) ?? settings.merge_method ?? DEFAULTS.merge_method,
+        problems: mergeProblems(permission()),
+        require: required,
+        base: settings.base_branch,
+        wait: !args['no-wait'],
+        timeoutS: Number(args.timeout ?? 540),
+        intervalS: Number(args.interval ?? 30),
+      });
       break;
     case 'wait-merge':
       result = await waitMerge(
@@ -659,24 +731,8 @@ async function main(argv: string[]): Promise<number> {
       } else if (command === 'merge') {
         const review = reviewFrom(args, repo, settings.base_branch);
         const resolved = permission();
-        if (resolved.merge_vetoed)
-          throw new WorkflowError('repo settings set merge = "never"; configuration veto');
         // Collected with every other unmet requirement, so one refusal names them all.
-        const problems: string[] = [];
-        if (resolved.missing_user_authorizations.includes('merge'))
-          problems.push('the user has not allowed this merge (--authorized)');
-        if (resolved.missing_user_authorizations.includes('publication'))
-          problems.push(
-            'merging publishes a release the user has not allowed (--publication-authorized)',
-          );
-        if (resolved.publication_effect === 'unknown')
-          problems.push(
-            'inspect what merging triggers first (--publication-effect none or automatic)',
-          );
-        if (resolved.host_scope !== 'allowed')
-          problems.push(
-            `host permission scope is ${resolved.host_scope.replace('_', ' ')}; use the native tool approval flow (--host-scope)`,
-          );
+        const problems = mergeProblems(resolved);
         // A merge always runs under a task record, so a crash mid-merge is recoverable; a short
         // task gets one here instead of being refused.
         if (!store.exists()) {
@@ -709,7 +765,8 @@ async function main(argv: string[]): Promise<number> {
     (command === 'gate' && !status.allowed) ||
     (command === 'docs-check' && !(result as { ok?: boolean }).ok) ||
     (command === 'run' && !['passed', 'reconciled'].includes(status.status ?? '')) ||
-    (command === 'wait-merge' && status.status !== 'merged')
+    (command === 'wait-merge' && status.status !== 'merged') ||
+    (command === 'automerge' && !['merged', 'handed-off'].includes(status.status ?? ''))
   ) {
     return 1;
   }

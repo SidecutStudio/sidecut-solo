@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.42.0] - 2026-11-27
+
+### Added
+
+- `solo automerge PR` hands a PR to GitHub auto-merge, or to a merge label with `--label automerge`, and then waits for the merge. It refuses until the PR head has a clean saved review and the merge is allowed. It also refuses while any required check has failed or never reported, while the PR is stacked on another open PR, and when GitHub would merge at once, or hasn't yet worked out whether it would, or when a check Solo requires but branch protection doesn't hasn't passed yet, (then `solo merge` is the way). It also records the handoff, so the turn guard knows exactly what this worktree is waiting on. If a commit lands on the PR after the handoff, the wait takes the PR off automerge instead of letting the unreviewed head merge. If it merged before the wait saw the push, the wait says so and names the commits to review.
+- A hard cap on deep review rounds. `solo review` now takes `--level light|standard|deep`, and `--scope fix-diff` for a review of only the fix. It counts the deep reviews of the whole change saved on the PR's branch and refuses one past `deep_review_rounds` (default 3, set it in `solo-workflow.toml`). The session then stops and gives the owner two choices: rethink the design, or accept the remaining minor findings. A fix-diff review is refused unless the review before it left no blocker or major findings.
+- Antigravity now runs the merge guard and the turn guard's Stop hook, the same as Claude Code and Codex.
+
+### Changed
+
+- The guards no longer try to read shell commands. The turn guard decides from the `solo automerge` record and from GitHub's view of the branch's PR. A merge label or auto-merge set by hand, with no record, still holds the turn and sends the session to `solo automerge`. A PR that merged, closed or left automerge clears its record. The merge guard is now a word check: any shell command that names a gh merge is refused and sent to `solo merge` or `solo automerge`. A commit message that mentions one goes in a file instead. Turning auto-merge off is still allowed.
+- A running `solo wait-merge` counts as the watcher until shortly after the end of the wait it announced. A loop that runs it again right away stays covered, and a waiter that died stops counting. The process-table scan from 0.41.4 is gone.
+- The hooks are about 690 lines shorter, and their tests 270. Each review of #22, #24 and #28 had found another shell form the parser missed, so the fixes never converged.
+
 ## [0.41.4] - 2026-11-27
 
 ### Fixed
