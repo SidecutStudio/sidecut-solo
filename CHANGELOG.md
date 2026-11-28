@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1] - 2026-11-28
+
+### Changed
+
+- `solo-write-copy` now asks for or finds reference pages and the repo's voice file before writing, creates `VOICE.md` on the user's first verdict when the repo has none, ships fill-in templates for homepage and listing copy, points READMEs and technical docs to write directly from the code using a plain runnable shape, delivers rewrites as plain text in a before-and-after table alongside the rendered result, and uses "prompt" rather than "brief" for agent instructions.
+- `scan-copy.mjs` now flags machinery words in the first screen (`worktree`, `MCP`, `manifest`, `CI`, `trace`, `harness`, `orchestration`, `pipeline`, `workflow`, `lifecycle`), sentences stacking three or more clauses, counts of tests, PRs, skills or tools, and "brief" used for an agent or writer prompt.
+
 ## [0.43.0] - 2026-11-27
 
 ### Added

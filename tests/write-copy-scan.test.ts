@@ -619,3 +619,143 @@ test('--docs leaves lists of three and menu paths alone but keeps other arrows',
     expect(out).toContain(':7  arrow');
   }
 });
+
+test('flags rejected draft lines from sidecut.dev previews for jargon and stacked clauses', async () => {
+  const rejected = [
+    [
+      'Each one gets its own worktree and an agent of its own, and Offloadr stays with the pull request until it merges: a failed check or a review comment goes straight back to the agent that wrote the code, and the other agent reviews the work before you ever see it.',
+      ['machinery', 'stacked-clauses'],
+    ],
+    [
+      'In one of Agent Issue’s sample runs, the agent tells you publication is pending while its own trace shows it already tried to publish.',
+      ['machinery'],
+    ],
+    [
+      'Say that and Solo takes it from there: it finds the cause, makes the fix, hands the diff to a reviewer agent that reads it cold, and merges only the exact commit that was reviewed, once every required check has passed on it.',
+      ['stacked-clauses'],
+    ],
+    ['Ask for a plugin, get a repo that passes CI on its first commit.', ['machinery']],
+    [
+      'Manifests for Claude Code, Codex and Antigravity, a bundled MCP server, a first skill, tests and automatic releases.',
+      ['machinery'],
+    ],
+    [
+      'From then on every repo runs the same checker, which points at each break with its file, line and fix, so the tenth plugin you ship looks like it came from the same hand as the first.',
+      ['stacked-clauses'],
+    ],
+    [
+      'In one of them the reply says publication is pending, while the recorded actions show it already published: a reply that reads fine, and Agent Issue fails it.',
+      ['stacked-clauses'],
+    ],
+  ] as const;
+
+  for (const [line, expected] of rejected) {
+    const { code, out } = await scan([], `${line}\n`);
+    expect(code).toBe(0);
+    for (const id of expected) expect(out, line).toContain(`  ${id}  `);
+  }
+});
+
+test('passes accepted lines from copy-lessons without flags', async () => {
+  const accepted = [
+    'Verify what your agent did, not its reply.',
+    'Write the tests once and run them through Claude Code, Codex, Gemini CLI and Antigravity, with your skill and without it.',
+    'The verifier’s comparison from the rebuild: the original, the rebuild, and where their pixels differ.',
+    'Ask a bot in Slack… and come back to a tested pull request.',
+    'AI agents default to the shortest path. These skills close the shortcut.',
+  ];
+
+  for (const line of accepted) {
+    const { code, out } = await scan([], `${line}\n`);
+    expect(code).toBe(0);
+    expect(out, line).toContain('0 flags to look at.');
+  }
+});
+
+test('flags machinery words in the first screen and allows them later on the page', async () => {
+  for (const word of [
+    'worktree',
+    'MCP',
+    'manifest',
+    'CI',
+    'trace',
+    'harness',
+    'orchestration',
+    'pipeline',
+    'workflow',
+    'lifecycle',
+  ]) {
+    const firstScreen = await scan([], `This ${word} runs your local build.\n`);
+    expect(firstScreen.out, word).toContain('  machinery  ');
+  }
+
+  const meta = await scanFile(
+    'meta-machinery.html',
+    '<!doctype html><html><head><meta name="description" content="Manage every agent workflow and MCP server."></head><body><p>Plain opening words.</p></body></html>',
+  );
+  expect(meta).toContain('  machinery  ');
+  expect(meta).toContain('(in description)');
+
+  const intro = [
+    'Notes stay together.',
+    'Your team drops weekly notes into one shared folder instead of losing decisions in long chat threads across five channels.',
+    'Clients stop asking twice.',
+    'Open Tuesday morning and export fresh graphics in seconds, because every colour and font stays locked to the client account you picked last month.',
+    'New hires never guess.',
+    'Send a draft link straight from your laptop so reviewers leave comments beside each headline instead of replying in separate emails.',
+    'Approve with one click.',
+    'Keep every past campaign in its own dated directory so next quarter starts with working files instead of empty templates or stale assets.',
+    'Search by tag or client name whenever someone needs an earlier launch image back, and export the whole approved folder at once.',
+    'Older projects stay ready.',
+    'Everything exported last spring remains easy to copy when another campaign opens with the same team and product line.',
+    'Start in under a minute.',
+    'Share the link with your editor when the batch is ready, and download clean assets for desktop and mobile screens right away.',
+  ].join(' ');
+  const later = await scan(
+    [],
+    `# Product\n\n${intro}\n\n## Under the hood\n\nEach task runs in its own worktree and records a trace.\n`,
+  );
+  expect(later.out).toContain('0 flags to look at.');
+});
+
+test('flags counts of tests, PRs, skills or tools, and leaves --docs alone', async () => {
+  for (const line of [
+    'Backed by 420 tests before every release.',
+    'Ships after 18 PRs landed this week.',
+    'Over 120 pull requests merged automatically.',
+    'Includes 17 skills ready to install.',
+    'Connects dozens of tools out of the box.',
+  ]) {
+    const { out } = await scan([], `${line}\n`);
+    expect(out, line).toContain('  vanity-count  ');
+  }
+
+  const plain = await scan([], 'Write your tests once and keep 1 tool beside your editor.\n');
+  expect(plain.out).toContain('0 flags to look at.');
+
+  const docs = await scan(['--docs'], 'The workflow runs CI with 120 tests across 6 tools.\n');
+  expect(docs.out).toContain('0 flags to look at.');
+});
+
+test('flags "brief" used for an agent or writer prompt, while leaving ordinary uses alone', async () => {
+  for (const line of [
+    'Brief the writer with the rejected lines.',
+    "Check the subagent's brief before running it.",
+    'Give each worker the same brief.',
+    'The task brief names the required checks.',
+  ]) {
+    const { out } = await scan([], `${line}\n`);
+    expect(out, line).toContain('  agent-brief  ');
+    const docOut = await scan(['--docs'], `${line}\n`);
+    expect(docOut.out, `--docs ${line}`).toContain('  agent-brief  ');
+  }
+
+  for (const ok of [
+    'Give the agent a brief summary first.',
+    'In brief, the agent checks the build locally.',
+    'It was tested on the same briefs as the others.',
+  ]) {
+    const { out } = await scan([], `${ok}\n`);
+    expect(out, ok).toContain('0 flags to look at.');
+  }
+});
