@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.43.0] - 2026-11-27
+
+### Added
+
+- On its first project task, Solo offers one setup for your branch and checks, merge policy, reviews, worktrees, writing voice and integrations. Save your choices or continue with neutral defaults. Writing guidance follows your chosen guide, and optional services only appear when your project uses them.
+
 ## [0.42.3] - 2026-11-27
 
 ### Changed

@@ -1,15 +1,18 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { load } from '../../plugins/sidecut-solo/server/src/helper/lib/config.ts';
-import { cli, makeRepo } from './fixture.ts';
+import { cli, makeRepo, scratch } from './fixture.ts';
 
 function write(repo: string, files: Record<string, string>) {
   for (const [name, content] of Object.entries(files)) writeFileSync(join(repo, name), content);
 }
 
 describe('settings', () => {
-  test('no files shows defaults and points to Setup', () => {
+  beforeEach(() => vi.stubEnv('HOME', scratch()));
+  afterEach(() => vi.unstubAllEnvs());
+
+  test('a fresh repository offers setup and has neutral defaults', () => {
     const { repo } = makeRepo();
     const result = load(repo);
     expect(result.files).toEqual([]);
@@ -24,7 +27,67 @@ describe('settings', () => {
       review_effort: 'medium',
       deep_review_rounds: 3,
     });
-    expect(result.hint).toContain('Setup');
+    expect(result.setup_needed).toBe(true);
+    expect(result.user_preferences).toBeUndefined();
+    expect(result.hint).toContain('solo-configure-project');
+  });
+
+  test('the next run honours a saved choice to keep defaults', () => {
+    const { repo } = makeRepo();
+    write(repo, { 'solo-workflow.local.toml': '# Keep Solo defaults for this repository.\n' });
+    const result = load(repo);
+    expect(result.setup_needed).toBe(false);
+    expect(result.files).toEqual(['solo-workflow.local.toml']);
+    expect(result.defaults.merge).toBe('ask');
+    expect(result.config).toEqual({});
+  });
+
+  test('a folder outside Git does not offer project setup', () => {
+    expect(load(scratch()).setup_needed).toBe(false);
+  });
+
+  test('personal preferences apply without a project file, and project values take precedence', () => {
+    const { repo } = makeRepo();
+    const preferences = join(process.env.HOME as string, '.config', 'solo');
+    mkdirSync(preferences, { recursive: true });
+    write(preferences, {
+      'preferences.toml':
+        'review = "light"\nworktrees = "never"\nvoice_guide = "/example/voice.md"\n',
+    });
+    const fresh = load(repo);
+    expect(fresh.setup_needed).toBe(false);
+    expect(fresh.files).toEqual([]);
+    expect(fresh.user_preferences).toBe(join(preferences, 'preferences.toml'));
+    expect(fresh.config).toEqual({
+      review: 'light',
+      worktrees: 'never',
+      voice_guide: '/example/voice.md',
+    });
+
+    write(repo, {
+      'solo-workflow.toml':
+        'review = "deep"\n[integrations]\nci = "Hosted CI"\nissue_tracker = "Team Tracker"\n',
+      'solo-workflow.local.toml': 'voice_guide = ""\n[integrations]\nissue_tracker = "off"\n',
+    });
+    expect(load(repo).config).toEqual({
+      review: 'deep',
+      worktrees: 'never',
+      voice_guide: '',
+      integrations: { ci: 'Hosted CI', issue_tracker: 'off' },
+    });
+  });
+
+  test('user preferences cannot change merge policy or enable integrations across projects', () => {
+    const { repo } = makeRepo();
+    const preferences = join(process.env.HOME as string, '.config', 'solo');
+    mkdirSync(preferences, { recursive: true });
+    write(preferences, {
+      'preferences.toml': 'merge = "when-green"\n[integrations]\nci = "Hosted CI"\n',
+    });
+    const result = load(repo);
+    expect(result.config).toEqual({});
+    expect(result.defaults.merge).toBe('ask');
+    expect(result.problems).toHaveLength(2);
   });
 
   test('defaults list only keys the files leave unset; invalid values fall back', () => {
@@ -106,6 +169,7 @@ describe('settings', () => {
       write(repo, { 'solo-workflow.toml': content });
       const result = load(repo);
       expect(result.files).toEqual([]);
+      expect(result.setup_needed).toBe(false);
       expect(result.problems.length).toBeGreaterThan(0);
     });
   }

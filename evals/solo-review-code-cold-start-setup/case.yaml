@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: solo-review-code-cold-start-setup
+context:
+  scaffold_script: fixture.sh

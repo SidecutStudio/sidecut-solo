@@ -3,11 +3,15 @@ name: solo-review-design
 description: "Reviews rendered screens for concrete design improvements. Use when the user asks about layout, clarity or accessibility of a screen. Not for functional journey verification (use solo-test-behavior) or rewriting its words (use solo-write-copy)."
 argument-hint: "[URL, PR, branch or mockup]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" user-facing *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
   - mcp__plugin_sidecut-solo_solo__get_user_facing_changes
 ---
 
 # Review design
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Review what people actually see and explain the most useful improvements. Report findings without editing the product.
 

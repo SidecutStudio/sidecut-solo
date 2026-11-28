@@ -3,12 +3,16 @@ name: solo
 description: "Coordinates project work through the appropriate Solo skills. Use when the user wants an outcome spanning diagnosis, implementation, verification or delivery, or a hands-off run. Not for platform administration outside the project."
 argument-hint: "[desired outcome]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" brief *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Sidecut Solo
 
 Carry the user's requested outcome through the needed skills. Read the selected skill before acting; this table does not replace its method.
+
+For project requests, run `solo config` for the target checkout before the hands-off questions or work. If `setup_needed` is true, invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root and carry the settings and any setup answer into the selected skills.
 
 ## Pick a skill
 

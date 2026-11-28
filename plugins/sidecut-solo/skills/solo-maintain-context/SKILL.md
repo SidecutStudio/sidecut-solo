@@ -3,10 +3,14 @@ name: solo-maintain-context
 description: "Maintains repo-owned context packs and evidence-backed coding standards and review guidance. Use when asked to create a context pack, scaffold project standards or review docs, refresh those docs from history, or check docs against the code. Not for documenting product features or setting up Solo checks and merge policy (use solo-configure-project)."
 argument-hint: "[context pack <name> | docs scaffold | docs refresh | match reality] [preview]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" docs-check *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Maintain context
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Work in the named repository and its active checkout. Read repository instructions and existing docs before proposing paths. Use [context-packs.md](references/context-packs.md) to create a pack, [project-docs.md](references/project-docs.md) to scaffold or refresh standards and review docs, and [match-reality.md](references/match-reality.md) to check docs and instructions against the code.
 

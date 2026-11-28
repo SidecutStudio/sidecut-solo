@@ -39,7 +39,7 @@ Verify claimed provider outcomes before reporting them. Report decisions, skippe
 | solo-review-design | Inspect rendered design starting from what is already known about the surface, get a cold second look, and challenge findings before consequential decisions. |
 | solo-test-behavior | Exercise actual journeys, boundaries, saved state and recovery. |
 | solo-deliver-change | Recover work, verify the latest head, deliver with permission and confirm each requested output. |
-| solo-configure-project | Maintain settings and instruction wiring, installing missing project profiles only on request. |
+| solo-configure-project | Offer first-run setup, maintain settings and instruction wiring, and install missing project profiles only on request. |
 | solo-maintain-context | Discover scoped project guidance and scaffold context packs or maintain evidence-backed coding standards and review docs. |
 | solo-prevent-mistake | Correct demonstrated recurring working-method failures with a scoped change. |
 | solo-compare-plugin | Record requested real use or equivalent comparisons without overstating attribution. |
@@ -115,9 +115,11 @@ Claude deep review uses server/data/workflows/review-change.js. Codex uses nativ
 
 ## Settings and helper commands
 
-Read solo-workflow.toml and optional solo-workflow.local.toml. Local values override individual keys; check commands merge by name.
+Read personal defaults from `~/.config/solo/preferences.toml`, then overlay `solo-workflow.toml` and `solo-workflow.local.toml`. Tables merge by key. User-level preferences can set review, worktrees and voice. Checks, merge policy and integrations belong to an individual repository.
 
-Settings cover the base branch, checks, merge policy, method, required checks, worktrees, protected paths, the review level, models and effort, and the deep review round cap. Report malformed or unknown settings without weakening them.
+Settings cover the base branch, checks, merge policy, method, required checks, worktrees, protected paths, the review level, models and effort, the deep review round cap, the voice guide and optional integrations. Report malformed or unknown settings without weakening them.
+
+All skills doing project work follow [settings.md](settings.md) before acting. In a Git checkout with no project settings or user preferences, `solo config` reports `setup_needed`. The first relevant skill offers setup together and once through `solo-configure-project`. A user who declines can continue with neutral defaults and can explicitly save that choice for the project. Optional integrations remain off unless the project or user selects them.
 
 Discover unset facts from the current repository. Keep personal overrides ignored. Modify protected generated files through their source and documented generator.
 

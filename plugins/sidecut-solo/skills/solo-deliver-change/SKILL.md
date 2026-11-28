@@ -19,6 +19,8 @@ allowed-tools:
 
 # Deliver change
 
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
+
 Bring the requested work to a verified end state while preserving everything the task does not own.
 
 ## Steps

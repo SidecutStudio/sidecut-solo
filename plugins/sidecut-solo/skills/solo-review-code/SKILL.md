@@ -11,6 +11,8 @@ allowed-tools:
 
 # Review code
 
+First run `solo config` for the target checkout. If `setup_needed` is true, invoke `solo-configure-project` before looking at the diff or deciding whether there is enough code to review. Offer setup and wait for the user's choice. The offer itself is read-only. Follow `server/data/settings.md` from the loaded plugin root.
+
 Find defects supported by evidence and report the limits of the review.
 
 ## Steps

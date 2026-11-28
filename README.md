@@ -1,6 +1,6 @@
 # Sidecut Solo
 
-Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.
+Hand your coding agent a whole change and get back a reviewed pull request that follows your repo's rules.
 
 ## What it does
 
@@ -74,7 +74,9 @@ Open a project and ask in plain words:
 
 ## Settings
 
-Ask Solo to set up a project and it writes `solo-workflow.toml` at the repo root from what it finds in your manifests, CI and branch protection. It asks only about policy it can't observe. A typical file:
+The first time Solo works in a Git project without settings or personal preferences, it offers one short setup. It proposes the base branch and checks it can verify and asks how you want merges, reviews, worktrees, writing and optional integrations to work. You can save your choices or continue with the defaults.
+
+Shared choices go in `solo-workflow.toml` at the repo root. A typical file:
 
 ```toml
 base_branch = "main"
@@ -89,9 +91,11 @@ test = "npm test"
 lint = "npm run lint"
 ```
 
-`merge = "ask"` is the default: the agent prepares everything and waits for your yes. `when-green` lets it merge on its own once the required checks pass on the reviewed commit. Personal overrides go in `solo-workflow.local.toml`, which stays out of Git. The file name comes from the plugin's earlier name and stays as it is so existing projects keep working.
+`merge = "ask"` is the default. The agent prepares everything and waits for your yes. `when-green` lets it merge once the required checks pass on the reviewed commit and the other delivery gates are met. Optional integrations are left unset until you select them for the project.
 
-To teach the agent your codebase, ask `solo-maintain-context` to scaffold context packs and review guidance from your history. A `VOICE.md` at the root sets the voice for anything people read. To change Solo itself, fork this repo, edit the skills under `plugins/sidecut-solo/skills/`, and add your fork as the marketplace instead.
+Personal review, worktree and voice defaults can go in `~/.config/solo/preferences.toml`. Shared project settings take precedence. Put personal changes for one project in `solo-workflow.local.toml`, which stays out of Git and takes precedence over both files.
+
+For writing, set `voice_guide` to a path or keep a `VOICE.md` at the repo root. You can start a guide from your own examples, adapt Solo's general guidance or use a guide you already have. To teach the agent your codebase, ask `solo-maintain-context` to scaffold context packs and review guidance from your history. To change Solo itself, fork this repo, edit the skills under `plugins/sidecut-solo/skills/`, and add your fork as the marketplace instead.
 
 ## Privacy
 

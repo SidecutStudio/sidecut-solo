@@ -1,11 +1,11 @@
 {
   "note": "These folders are generated. Edit them at their source and sync, or delete this file to own them here.",
-  "commit": "fcad0164ab79779c028efc31a4583ffc81c25df1",
+  "commit": "ff9e9e8a7fb3211479b3a89dff139f9082d1af20",
   "copies": [
     {
       "path": "evals",
       "from": "triggers/sidecut-solo",
-      "hash": "sha256-34d3a4c2108bbe9b07703b1b0744958fea3292fe49f3a57ecee584de99c3d13e"
+      "hash": "sha256-480a7e454904b56ec6a120250c8a4c1feb7dbfb772a4438e7a97d44dc85fe33d"
     }
   ]
 }

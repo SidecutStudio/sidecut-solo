@@ -3,11 +3,15 @@ name: solo-compare-plugin
 description: "Compares plugin sessions and controlled runs from recorded evidence. Use when asked to dogfood a plugin or compare versions or presence. Not for product QA (use solo-test-behavior)."
 argument-hint: "[session or comparison]"
 allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" qa-check *)
   - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" qa-compare *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Compare plugin
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Record what a plugin actually contributed and limit conclusions to observed evidence. Keep version comparisons distinct from comparisons with no plugin.
 

@@ -2,9 +2,14 @@
 name: solo-diagnose-problem
 description: "Investigates a failure or performance problem using evidence. Use when the cause is unknown or an error needs explanation. Not for edits or unfinished-work status."
 argument-hint: "[symptom or question]"
+allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Diagnose problem
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Explain the demonstrated cause or narrow the uncertainty without changing the user's work.
 

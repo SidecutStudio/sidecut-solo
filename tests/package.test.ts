@@ -78,6 +78,7 @@ const USER_INPUT_POINTERS = [
   'skills/solo-choose-approach/references/bake-off.md',
   'skills/solo-choose-approach/references/directions.md',
   'skills/solo-configure-project/SKILL.md',
+  'skills/solo-configure-project/references/first-run.md',
   'skills/solo-diagnose-problem/SKILL.md',
   'skills/solo-deliver-change/SKILL.md',
   'skills/solo-maintain-context/SKILL.md',

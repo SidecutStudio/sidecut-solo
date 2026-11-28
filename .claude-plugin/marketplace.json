@@ -4,12 +4,12 @@
     "name": "Sidecut Studio",
     "url": "https://sidecut.dev"
   },
-  "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+  "description": "Hand your coding agent a whole change and get back a reviewed pull request that follows your repo's rules.",
   "plugins": [
     {
       "name": "sidecut-solo",
       "source": "./plugins/sidecut-solo",
-      "description": "Hand your coding agent a whole change and get back a reviewed, merged pull request that followed your repo's rules.",
+      "description": "Hand your coding agent a whole change and get back a reviewed pull request that follows your repo's rules.",
       "category": "development"
     }
   ]

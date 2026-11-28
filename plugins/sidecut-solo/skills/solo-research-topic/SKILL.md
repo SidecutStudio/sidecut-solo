@@ -2,9 +2,14 @@
 name: solo-research-topic
 description: "Finds outside facts with current sources. Use when the user needs current documentation, capabilities, versions or prices. Not for choosing an approach (use solo-choose-approach)."
 argument-hint: "[question]"
+allowed-tools:
+  - Bash(sh "${CLAUDE_PLUGIN_ROOT}/server/data/helper/solo" config *)
+  - mcp__plugin_sidecut-solo_solo__get_settings
 ---
 
 # Research topic
+
+Before project work, run `solo config` for the target checkout. If `setup_needed` is true, pause and invoke `solo-configure-project` for first-run setup. Follow `server/data/settings.md` from the loaded plugin root.
 
 Answer the question with current evidence. Establish the applicable product and version before relying on a source.
 
