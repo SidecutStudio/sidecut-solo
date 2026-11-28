@@ -1,14 +1,21 @@
 # Visual reports
 
-Read this when comparisons, research, design reviews or other explanations become clearer when people can see the work.
+Read this before writing the result of a review, audit, rebuild, research question or comparison. It decides whether the result goes in chat or in an HTML report.
 
 ## Choose the format
 
-Default to an HTML report for design comparisons, blind bakeoffs and design reports. Use HTML for research with meaningful comparisons, diagrams or measured trends.
+Decide the format before writing the result. Publish an HTML report when the result has any of these:
 
-Use it for other work when a visual makes a decision or relationship easier to understand. Keep a short factual answer in chat.
+- 5 or more findings, problems or recommendations
+- a comparison of 3 or more options, versions or entries
+- a before-and-after or parity table
+- a flow, architecture or relationship that a diagram explains
+- measured data with more than 10 rows
+- a design comparison or blind bakeoff
 
-Honor a requested format or a text-only preference. Don't create an empty dashboard, decorative chart or a page that repeats a short answer.
+One of these is enough, even with fewer than 5 findings. With none of them, answer in chat: a short verdict, a clean pass, a status line or one fact. A requested format or a text-only preference wins over this test.
+
+With an HTML report, the chat reply still carries the verdict and the top three items, so nobody has to open the page to learn the answer. Don't create an empty dashboard, decorative chart or a page that repeats a short answer.
 
 Read this file from the loaded plugin's `server/data/` folder. The sibling `visual-report.html` and `visual-report.css` provide an adaptable layout and tokens. Bundled Latin Geist fonts keep typography available offline.
 
@@ -20,7 +27,7 @@ Read this file from the loaded plugin's `server/data/` folder. The sibling `visu
 4. Put useful material above the fold: the decision, a readable comparison or the most important finding. Avoid a cover screen with no work visible.
 5. Keep each claim near its source. Preserve versions, observation dates, units, sample counts, uncertainty and untested states when relevant.
 6. Keep implementation details in native disclosures. Leave decisions, severity, blockers and essential limitations visible.
-7. Save a standalone HTML file in the host's artifact folder or a task-owned output folder. Read-only report tasks may create artifacts without changing product code.
+7. Save a standalone HTML file in the host's artifact folder or a task-owned output folder. For read-only work, save artifacts outside the reviewed repository and leave its files unchanged.
 8. Inline the stylesheet and embed required images. Embed the bundled Geist fonts as data URLs and preserve their accompanying license notices in the HTML source.
 9. Make the report useful without scripts, storage or network access. Add interaction only when it helps compare, inspect or understand the material.
 10. Render the saved file before sharing it. Check narrow, tablet and desktop layouts, both themes, keyboard focus, zoom and print output.
@@ -46,7 +53,7 @@ Don't style one blind entry as the winner. Keep crops, order, scale and availabl
 
 ## Use the shared design
 
-The packaged stylesheet, `visual-report.css`, owns the report's role tokens. It needs no source checkout or other installed plugin.
+The packaged stylesheet, `visual-report.css`, holds the report's role tokens. It needs no source checkout or other installed plugin.
 
 When updating the stylesheet, keep its role names and light/dark pairs; don't invent a separate report palette.
 
@@ -58,7 +65,7 @@ Use a strong heading, a readable lede and varied sections. Cards need meaningful
 
 Avoid gradients, glows, ornamental charts, stock dashboard chrome and giant empty hero areas. Let screenshots and diagrams occupy meaningful space.
 
-Keep the report frame in this design. Preserve the reviewed product's own tokens, voice and original screenshots inside it.
+Keep the report frame in the packaged design. Preserve the reviewed product's own tokens, voice and original screenshots inside it.
 
 Support device theme preference and reduced motion. Give images useful alternative text, tables headers and controls visible keyboard focus.
 

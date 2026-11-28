@@ -13,7 +13,7 @@
   font-display: swap;
   src: url("visual-report-geist-mono.woff2") format("woff2");
 }
-/* Report role tokens: warm paper, ink and a restrained orange accent, in light and dark pairs.
+/* Role tokens for the report frame.
    Report layout below uses the same type, spacing, radius and color roles. */
 :root {
   color-scheme: light dark;

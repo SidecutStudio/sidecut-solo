@@ -1,6 +1,6 @@
 {
   "name": "sidecut-solo",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "description": "Hand your coding agent a whole change and get back a reviewed pull request that follows your repo's rules.",
   "author": {
     "name": "Sidecut Studio",
