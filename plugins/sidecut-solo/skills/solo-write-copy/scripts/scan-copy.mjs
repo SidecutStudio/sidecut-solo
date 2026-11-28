@@ -6,11 +6,13 @@ import { extname } from 'node:path';
 
 const HELP = `Usage: node scan-copy.mjs [--docs] [file ...]
 
-Scans Markdown, HTML or plain text for common AI-writing patterns and prints
-one line per flag: file:line, pattern, excerpt. Reads standard input when no
-file is given, treating it as HTML when it starts with a tag and as Markdown
-otherwise. Code blocks, inline code, comments, scripts and styles are skipped.
-Lines wrapped inside a paragraph are joined before sentences are counted.
+Scans Markdown, HTML or plain text for common AI-writing tells, first-screen
+machinery words, stacked clauses, vanity counts and "brief" used for an agent
+prompt, and prints one line per flag: file:line, pattern, excerpt. Reads standard
+input when no file is given, treating it as HTML when it starts with a tag and
+as Markdown otherwise. Code blocks, inline code, comments, scripts and styles are
+skipped. Lines wrapped inside a paragraph are joined before sentences are
+counted.
 
 Alt text, title and aria-label attributes and the page's description and
 social titles are scanned too. On a built page whose text sits on a few long
@@ -21,8 +23,8 @@ description aren't compared, and a link or button label on its own, such as
 one per card, isn't counted.
 
 With --docs, the input is agent or reference docs (AGENTS.md, docs/, config
-comments), where lists of three and menu paths such as "Settings → People"
-are normal, so neither is flagged.
+comments), where lists of three, menu paths such as "Settings → People",
+technical terms and counts are normal, so those aren't flagged.
 
 Prints sentence-rhythm figures for each input. Exits 0 when every input was
 scanned, 1 when a file couldn't be read; the other files are still scanned.`;
@@ -112,6 +114,21 @@ const TRIAD =
   /\b[\w'-]+(?: [\w'-]+){0,2}, [\w'-]+(?: [\w'-]+){0,2},? (?:and|or) [\w'-]+(?: [\w'-]+){0,2}\b/i;
 const SPLIT_CONTRAST = /\b(?:does not|doesn't) mean\b/i;
 const IT_MEANS = /^(?:it|this|that) means\b/i;
+const FIRST_SCREEN_WORDS = 150;
+const FIRST_SCREEN_META =
+  /^(?:description|og:title|og:description|twitter:title|twitter:description)$/;
+const MACHINERY =
+  /\b(?:worktrees?|mcp|manifests?|ci|traces?|harness(?:es)?|orchestrat(?:e|es|ed|ing|ion)|pipelines?|workflows?|lifecycles?)\b/i;
+const VANITY_COUNT =
+  /\b(?:(?:over|more than|nearly|almost|around|about)\s+)?(?:(?:[2-9]\d*|1\d+)(?:,\d{3})*\+?|dozens of|hundreds of|thousands of|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty)\s+(?:[a-z-]+\s+){0,2}(?:tests?|prs?|pull requests?|skills?|tools?)\b/i;
+const CLAUSE_JOIN =
+  /;|:(?=\s+\S+(?:\s+\S+){2,})|,\s+(?:and|or|but|so|yet|which|who|where|when|while|because|since|although|though|unless|until|before|after|once)\b/gi;
+const AGENT_SUBJECT = /\b(?:agents?|writers?|subagents?|workers?|models?)\b/i;
+const BRIEF_VERB =
+  /\bbrief(?:s|ed|ing)?\s+(?:the\s+|an?\s+|each\s+|every\s+|another\s+|any\s+|other\s+)?(?:agents?|writers?|subagents?|workers?|models?)\b/i;
+const BRIEF_NOUN = /\b(?:agents?|writers?|subagents?|workers?|models?|task)(?:'s|s')?\s+briefs?\b/i;
+const BRIEF_ADJ_NOUN =
+  /\bbrief\s+(?:summary|overview|note|notes|look|check|guide|description|intro|introduction|example|pause|wait|delay|reply|answer|message|history|list|line|tour|visit|stop|chat)\b/gi;
 // A line that starts a new block: a list item, heading, table row or quote.
 const BLOCK_START = /^[ \t]*(?:[-*+] |\d+[.)] |#|\||>)/;
 // The underline of a Setext heading, or a horizontal rule.
@@ -511,6 +528,36 @@ function labelsOf(clean) {
   return labels;
 }
 
+function hasAgentBrief(text) {
+  if (BRIEF_VERB.test(text) || BRIEF_NOUN.test(text)) return true;
+  if (!AGENT_SUBJECT.test(text)) return false;
+  const cleaned = text.replace(/\bin brief\b/gi, '').replace(BRIEF_ADJ_NOUN, '');
+  return /\bbriefs?\b/i.test(cleaned);
+}
+
+// Counts mid-sentence clause joins, ignoring the final ", and/or item" of an Oxford-comma list.
+function hasStackedClauses(text) {
+  let joins = 0;
+  for (const match of text.matchAll(CLAUSE_JOIN)) {
+    const token = match[0];
+    if (/^,\s+(?:and|or)$/i.test(token)) {
+      const before = text.slice(0, match.index);
+      const lastComma = before.lastIndexOf(',');
+      const barePrecedingComma =
+        lastComma !== -1 &&
+        !/^,\s+(?:and|or|but|so|yet|which|who|where|when|while|because|since|although|though|unless|until|before|after|once)\b/i.test(
+          before.slice(lastComma),
+        );
+      const after = text.slice(match.index + token.length).split(/[,;:!?]/, 1)[0];
+      const tailWords = after.trim().split(/\s+/).filter(Boolean).length;
+      if (barePrecedingComma && tailWords <= 4) continue;
+    }
+    joins++;
+    if (joins >= 2) return true;
+  }
+  return false;
+}
+
 function scan(name, input, { docs = false } = {}) {
   // Private-use characters are the scan's own marks, so any in the input are read as unknown.
   const source = input.replace(/\r\n?/g, '\n').replace(/[\uE000-\uF8FF]/g, '\uFFFD');
@@ -609,6 +656,31 @@ function scan(name, input, { docs = false } = {}) {
     }
   for (const s of [...list, ...fields].filter((s) => DASH.test(s.text)))
     flag(s, 'dash', "a dash doing a comma or colon's job", s.text);
+  if (!docs) {
+    let wordsBefore = 0;
+    const firstScreenSections = new Set([0]);
+    for (const s of list) {
+      if (wordsBefore < FIRST_SCREEN_WORDS) {
+        firstScreenSections.add(s.section);
+        if (MACHINERY.test(s.text))
+          flag(s, 'machinery', 'machinery word in the first screen', s.text);
+      }
+      wordsBefore += s.words;
+    }
+    for (const f of fields) {
+      const inOpening =
+        FIRST_SCREEN_META.test(f.field) ||
+        (f.field === 'alt' && firstScreenSections.has(f.section));
+      if (inOpening && MACHINERY.test(f.text))
+        flag(f, 'machinery', 'machinery word in the first screen', f.text);
+    }
+    for (const s of [...list, ...fields].filter((s) => VANITY_COUNT.test(s.text)))
+      flag(s, 'vanity-count', 'count of tests, PRs, skills or tools', s.text);
+  }
+  for (const s of list.filter((s) => hasStackedClauses(s.text)))
+    flag(s, 'stacked-clauses', 'three or more clauses stacked in one sentence', s.text);
+  for (const s of [...list, ...fields].filter((s) => hasAgentBrief(s.text)))
+    flag(s, 'agent-brief', 'say "prompt" instead of "brief" for agent instructions', s.text);
   const triads = prose.filter((s) => TRIAD.test(s.text));
   if (!docs && prose.length && triads.length >= 3 && triads.length / prose.length > 0.15)
     for (const s of triads) flag(s, 'triad', 'lists of three on repeat', s.text);
