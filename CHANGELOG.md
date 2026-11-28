@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.43.1] - 2026-11-28
+
+### Changed
+
+- Moved to Agentskills 2.17.0. The visual report guide now says when a result belongs in an HTML report instead of chat: five or more findings, a comparison of three or more options, a before-and-after table, a diagram, more than ten rows of data, or a design comparison.
+
 ## [0.43.0] - 2026-11-27
 
 ### Added
